@@ -164,6 +164,7 @@ function writeLedger(db: DatabaseSync, customer: Account, billId: number, paid: 
 
 // Save a confirmed draft once. Same draft_id again returns the first bill.
 export function saveBill(db: DatabaseSync, draft: Draft, rates: RateCard): SaveResult {
+  if (draft.items.length === 0) throw new Error("no items in bill");
   return inTransaction(db, () => {
     const existing = findBill(db, "draft_id", draft.draftId);
     if (existing) return toResult(existing, true);
