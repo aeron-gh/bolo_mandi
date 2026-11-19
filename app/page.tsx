@@ -6,9 +6,10 @@ export default function Home() {
   const rates = ratesFromSeed(readSeed());
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-rule px-4 py-3 sm:px-8">
-        <Image src="/logo.png" alt="Mandi Plus" width={757} height={203} preload className="h-10 w-auto" />
-        <span className="text-xl font-semibold text-brand">Bolo</span>
+      {/* items-baseline: an image's baseline is its bottom edge, which is the wordmark's baseline. */}
+      <header className="flex items-baseline gap-2 border-b border-line px-4 py-3 sm:px-6">
+        <Image src="/wordmark.png" alt="Mandi Plus" width={733} height={115} preload className="h-6 w-auto" />
+        <span className="text-[1.625rem] font-semibold leading-none">Bolo</span>
       </header>
       <BillScreen rates={rates} />
     </>
