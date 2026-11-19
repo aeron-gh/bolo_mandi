@@ -34,7 +34,7 @@ describe("voice billing", () => {
   it("accepts a full customer name after asking which account to read", () => {
     expect(say("Afzal ka hisaab batao")).toMatchObject({ kind: "answer", needsName: true });
     expect(voiceBill(db, rates, { ...empty, words: "Afzal Ahmed", customerId: 8, accountQuestion: true })).toMatchObject({
-      kind: "answer", text: expect.stringContaining("Afzal Ahmed ka udhaar ₹20,000"),
+      kind: "answer", text: expect.stringContaining("Afzal Ahmed owes ₹20,000"),
     });
   });
 
@@ -44,7 +44,7 @@ describe("voice billing", () => {
     "टुडे सेल", "Aaj sale kitni hui hai?", "Aaj ki bikri bata do",
   ])("gives a natural no-bills reply for %s", (words) => {
     expect(say(words)).toMatchObject({
-      kind: "answer", text: "Aaj abhi tak koi bill nahi kata hai.", speech: "आज अभी तक कोई बिल नहीं कटा है।",
+      kind: "answer", text: "No bills saved yet today.", speech: "आज अभी तक कोई बिल नहीं कटा है।",
     });
   });
 
@@ -61,12 +61,12 @@ describe("voice billing", () => {
     stamp.run("+1 day", "next");
     const turn = voiceBill(db, rates, { words: "today sale", items: [{ grade: 3, qty: 99 }], cash: 0, upi: 0,
       followUp: { kind: "grade", qty: 5, unit: "piece" }, accountQuestion: true });
-    expect(turn).toMatchObject({ kind: "answer", text: "Aaj ₹3,000 ki sale hui. 2 bill. Cash ₹1,000, Udhaar ₹2,000.",
+    expect(turn).toMatchObject({ kind: "answer", text: "Today's sales: ₹3,000 from 2 bills. Paid as cash ₹1,000, credit ₹2,000.",
       speech: "आज 3,000 रुपये की बिक्री हुई।" });
   });
 
   it.each(["yesterday's sales", "Vikas ki aaj ki sale", "kal ki sale batao"])("clarifies the available report for %s", (words) => {
-    expect(say(words)).toMatchObject({ kind: "answer", text: expect.stringContaining("aaj ki kul sale") });
+    expect(say(words)).toMatchObject({ kind: "answer", text: expect.stringContaining("today's total sales") });
   });
 
   it("distinguishes a conversational yes from an explicit instruction to save", () => {
@@ -79,7 +79,7 @@ describe("voice billing", () => {
   });
 
   it("reads highest outstanding balance from the ledger data", () => {
-    expect(say("सबसे ज़्यादा उधार किसका है?")).toMatchObject({ kind: "answer", text: expect.stringContaining("Deepak ka hai, ₹3,50,000") });
+    expect(say("सबसे ज़्यादा उधार किसका है?")).toMatchObject({ kind: "answer", text: expect.stringContaining("Deepak owes the most: ₹3,50,000") });
   });
 
   it.each([

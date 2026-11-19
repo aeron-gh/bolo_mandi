@@ -12,7 +12,7 @@ const PAUSE_MS = 5 * 60_000;
 // Thrown when an owner-only action arrives without an unlocked session. Routes answer 401.
 export class PinRequired extends Error {
   constructor() {
-    super("PIN chahiye");
+    super("Owner PIN needed");
     this.name = "PinRequired";
   }
 }
@@ -67,11 +67,11 @@ const tries = new WeakMap<DatabaseSync, { count: number; until: number }>();
 
 export function unlock(db: DatabaseSync, now: Date, body: unknown): string {
   const state = tries.get(db) ?? { count: 0, until: 0 };
-  if (now.getTime() < state.until) throw new Error("Bahut galat koshish. 5 minute baad try karein.");
+  if (now.getTime() < state.until) throw new Error("Too many wrong tries. Try again in 5 minutes.");
   if (!verifyPin(db, textField(asBody(body), "pin"))) {
     const count = state.count + 1;
     tries.set(db, count >= MAX_TRIES ? { count: 0, until: now.getTime() + PAUSE_MS } : { count, until: 0 });
-    throw new Error("Galat PIN");
+    throw new Error("Wrong PIN");
   }
   tries.delete(db);
   return createSession(db, now);

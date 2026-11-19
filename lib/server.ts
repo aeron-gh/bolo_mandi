@@ -167,5 +167,5 @@ export function clearLoginCookies(jar: CookieJar): void {
 
 // Login, signup, demo and logout must come from our own pages, never a form on another website.
 export function blockCrossSite(req: Request): void {
-  if (crossSite(req.headers, process.env.APP_ORIGIN)) throw new Error("Yeh request doosri website se aayi hai");
+  if (crossSite(req.headers, process.env.APP_ORIGIN)) throw new Error("This request came from another website");
 }

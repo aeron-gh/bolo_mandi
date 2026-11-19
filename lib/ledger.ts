@@ -171,8 +171,8 @@ type AdjustmentRow = { id: number; kind: string; amount_paise: number; note: str
 export function recordAdjustment(db: DatabaseSync, a: AdjustmentDraft): AdjustmentResult {
   if (!Number.isSafeInteger(a.amount) || a.amount === 0) throw new Error(`bad amount: ${a.amount}`);
   const note = a.note.trim().replace(/\s+/g, " ");
-  if (!note) throw new Error("note chahiye: kyun badla?");
-  if (note.length > 120) throw new Error("note bahut lamba hai (120 akshar tak)");
+  if (!note) throw new Error("Please add a note: why is it changing?");
+  if (note.length > 120) throw new Error("Note is too long (120 characters max)");
   return inTransaction(db, () => {
     const existing = db.prepare("SELECT id, kind, amount_paise, note, balance_after_paise FROM ledger_entries WHERE draft_id = ?")
       .get(a.draftId) as AdjustmentRow | undefined;
@@ -199,7 +199,7 @@ export type PromiseStatus = "kept" | "broken";
 export function setPromiseStatus(db: DatabaseSync, promiseId: number, status: PromiseStatus): { id: number; status: PromiseStatus } {
   const row = db.prepare("SELECT status FROM promises WHERE id = ?").get(promiseId) as { status: string } | undefined;
   if (!row) throw new Error(`unknown promise: ${promiseId}`);
-  if (row.status !== "open") throw new Error("sirf open vaada badla ja sakta hai");
+  if (row.status !== "open") throw new Error("Only an open promise can be marked");
   db.prepare("UPDATE promises SET status = ? WHERE id = ? AND status = 'open'").run(status, promiseId);
   return { id: promiseId, status };
 }

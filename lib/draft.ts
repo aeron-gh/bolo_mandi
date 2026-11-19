@@ -133,9 +133,9 @@ export function openEntries(draft: BillDraft): { items: ItemInput[]; cash: numbe
   return { items: draft.items, cash: draft.cash, upi: draft.upi };
 }
 
-export type QuickPayment = "cash" | "half" | "upi" | "udhaar";
+export type QuickPayment = "cash" | "half" | "upi" | "credit";
 
-// The quick payment buttons. "Aadha cash" is half the total rounded down to the paisa.
+// The quick payment buttons. "Half cash" is half the total rounded down to the paisa.
 export function paymentFor(choice: QuickPayment, total: number): { cash: number; upi: number } {
   if (choice === "cash") return { cash: total, upi: 0 };
   if (choice === "half") return { cash: Math.floor(total / 2), upi: 0 };

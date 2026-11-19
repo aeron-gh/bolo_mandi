@@ -62,21 +62,21 @@ describe("Bolo says the task back and waits for haan", () => {
     expect(ask("Manat ne 5000 cash diye")).toEqual({
       kind: "task",
       task: { action: "payment", customerId: 1, name: "Manat", amount: rs(5000), mode: "cash", allowAdvance: false },
-      text: "Manat se ₹5,000 cash mile. Udhaar ₹12,500 se ₹7,500 ho jayega. Likh doon?",
+      text: "Manat paid ₹5,000 in cash. Credit goes from ₹12,500 to ₹7,500. Shall I record it?",
       speech: "Manat से 5,000 रुपये कैश मिले। उधार 7,500 रुपये हो जाएगा। लिख दूँ?",
     });
   });
 
   it("vasooli with no mode says so instead of guessing cash", () => {
     expect(ask("Manat ne 2000 diye")).toMatchObject({
-      task: { mode: null }, text: "Manat se ₹2,000 mile, cash ya UPI nahi bataya. Udhaar ₹12,500 se ₹10,500 ho jayega. Likh doon?",
+      task: { mode: null }, text: "Manat paid ₹2,000 (cash or UPI not said). Credit goes from ₹12,500 to ₹10,500. Shall I record it?",
     });
   });
 
   it("more than is owed asks about advance first", () => {
     expect(ask("Vikas ne 10 hazaar UPI diye")).toMatchObject({
       task: { action: "payment", amount: rs(10000), allowAdvance: true },
-      text: "Vikas ka udhaar ₹8,000 hai, yeh ₹2,000 zyada hai. Zyada wala advance mein rakh doon?",
+      text: "Vikas owes ₹8,000, so this is ₹2,000 more. Keep the extra as advance?",
     });
   });
 
@@ -84,15 +84,15 @@ describe("Bolo says the task back and waits for haan", () => {
     expect(ask("Manat kal 5000 dega")).toEqual({
       kind: "task",
       task: { action: "promise", customerId: 1, name: "Manat", amount: rs(5000), due: "2026-11-20" },
-      text: "Manat ₹5,000 kal, 20 Nov tak dega. Vaada likh doon?",
+      text: "Manat will pay ₹5,000 tomorrow, 20 Nov. Record the promise?",
       speech: "Manat 5,000 रुपये कल तक देगा। वादा लिख दूँ?",
     });
   });
 
   it("asks for what is missing instead of guessing", () => {
-    expect(ask("Manat ne kuch paise diye")).toMatchObject({ kind: "task", task: null, text: "Manat ne kitne rupaye diye? Poori baat ek saath boliye, jaise “Manat ne 5000 cash diye”." });
-    expect(ask("Imran 10 hazaar dega")).toMatchObject({ kind: "task", task: null, text: "Imran kab tak dega, aaj, kal ya parso? Poori baat phir se boliye." });
-    expect(ask("Afzal ne 500 diye")).toMatchObject({ kind: "task", task: null, text: expect.stringMatching(/^Kaun se Afzal\? .*Afzal Khan.* Poora naam boliye\.$/) });
-    expect(ask("Zorawar ne 500 diye")).toMatchObject({ kind: "task", task: null, text: "“Zorawar” naam ka koi customer nahi mila. Naam ek baar phir boliye." });
+    expect(ask("Manat ne kuch paise diye")).toMatchObject({ kind: "task", task: null, text: "How much did Manat pay? Say it all at once, like “Manat ne 5000 cash diye”." });
+    expect(ask("Imran 10 hazaar dega")).toMatchObject({ kind: "task", task: null, text: "When will Imran pay: today, tomorrow or the day after? Please say the whole sentence again." });
+    expect(ask("Afzal ne 500 diye")).toMatchObject({ kind: "task", task: null, text: expect.stringMatching(/^Which Afzal\? .*Afzal Khan.* Please say the full name\.$/) });
+    expect(ask("Zorawar ne 500 diye")).toMatchObject({ kind: "task", task: null, text: "No customer called “Zorawar”. Please say the name again." });
   });
 });

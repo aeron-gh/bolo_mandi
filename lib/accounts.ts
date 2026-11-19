@@ -7,7 +7,7 @@ export type User = { id: number; name: string; email: string };
 export type GoogleProfile = { sub: string; email: string; name: string; emailVerified: boolean };
 
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
-const WRONG = "Email ya password galat hai";
+const WRONG = "Wrong email or password";
 const MAX_TRIES = 5;
 const PAUSE_MS = 5 * 60_000;
 
@@ -39,7 +39,7 @@ export function openAccounts(file: string): DatabaseSync {
 
 function cleanEmail(raw: string): string {
   const email = raw.trim().toLowerCase();
-  if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error("email sahi nahi hai");
+  if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error("Please enter a valid email");
   return email;
 }
 
@@ -55,11 +55,11 @@ const publicUser = (row: User): User => ({ id: row.id, name: row.name, email: ro
 
 export function signUp(db: DatabaseSync, input: { name: string; email: string; password: string }, now: Date): User {
   const name = cleanText(input.name, "name", 60);
-  if (!name) throw new Error("name chahiye");
+  if (!name) throw new Error("Please enter your name");
   const email = cleanEmail(input.email);
-  if (input.password.length < 8) throw new Error("password kam se kam 8 akshar ka ho");
+  if (input.password.length < 8) throw new Error("Password must be at least 8 characters");
   if (input.password.length > 200) throw new Error("password too long");
-  if (byEmail(db, email)) throw new Error("is email se account already hai");
+  if (byEmail(db, email)) throw new Error("An account with this email already exists");
   const salt = randomBytes(16).toString("hex");
   const { lastInsertRowid } = db
     .prepare("INSERT INTO users (email, name, password_hash, password_salt, created_at) VALUES (?, ?, ?, ?, ?)")
@@ -79,7 +79,7 @@ function triesFor(db: DatabaseSync): Map<string, { count: number; until: number 
 export function logIn(db: DatabaseSync, input: { email: string; password: string }, now: Date): User {
   const email = input.email.trim().toLowerCase();
   const state = triesFor(db).get(email) ?? { count: 0, until: 0 };
-  if (now.getTime() < state.until) throw new Error("Bahut galat koshish. 5 minute baad try karein.");
+  if (now.getTime() < state.until) throw new Error("Too many wrong tries. Try again in 5 minutes.");
   const row = byEmail(db, email);
   const given = hashPassword(input.password, row?.password_salt ?? "0".repeat(32));
   const ok = Boolean(row?.password_hash) && timingSafeEqual(Buffer.from(given, "hex"), Buffer.from(row!.password_hash!, "hex"));
@@ -114,7 +114,7 @@ export function endUserSession(db: DatabaseSync, token: string | null): void {
 
 // Google sign-in: same Google account → same user; a same-email password account is joined.
 export function googleUser(db: DatabaseSync, profile: GoogleProfile, now: Date): User {
-  if (!profile.emailVerified) throw new Error("Google email verified nahi hai");
+  if (!profile.emailVerified) throw new Error("This Google email is not verified");
   const email = cleanEmail(profile.email);
   const known = db.prepare("SELECT * FROM users WHERE google_sub = ?").get(profile.sub) as UserRow | undefined;
   if (known) return publicUser(known);

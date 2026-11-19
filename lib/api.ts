@@ -76,7 +76,7 @@ export function previewBill(db: DatabaseSync, rates: RateCard, body: unknown): B
     newOutstanding: credit.newOutstanding, credit: credit.status, overBy: credit.overBy,
   };
   let say = "";
-  if (overpaidBy > 0) say = `${formatRupees(overpaidBy)} zyada mila hai. Wapas dena hai ya advance rakhna hai?`;
+  if (overpaidBy > 0) say = `${formatRupees(overpaidBy)} more than the bill was paid. Give it back or keep it as advance?`;
   else if (req.items.length > 0) say = readBackText({ customerName: customer.name, ...numbers });
   return { customer, lines: bill.lines, ...numbers, creditLeft: credit.creditLeft, overpaidBy, say };
 }
@@ -95,7 +95,7 @@ export function searchCustomers(db: DatabaseSync, q: string | null): CustomerMat
 
 type VoiceQuestion = Extract<VoiceTurn, { kind: "question" }>;
 type VoiceAnswer = { kind: "answer"; text: string; speech: string; needsName?: true };
-// A khata task Bolo has heard and checked; it is saved only after the owner says "haan".
+// A ledger task Bolo has heard and checked; it is saved only after the owner says yes.
 export type LedgerTask =
   | { action: "payment"; customerId: number; name: string; amount: number; mode: "cash" | "upi" | null; allowAdvance: boolean }
   | { action: "promise"; customerId: number; name: string; amount: number; due: string };
@@ -136,43 +136,44 @@ function answerVoice(db: DatabaseSync, turn: VoiceQuestion, customerId: unknown)
       FROM bills
       WHERE date(created_at, '+05:30') = date('now', '+05:30')
     `).get() as { bills: number; total: number; cash: number; upi: number; udhaar: number };
-    if (!day.bills) return answer("Aaj abhi tak koi bill nahi kata hai.", "आज अभी तक कोई बिल नहीं कटा है।");
+    if (!day.bills) return answer("No bills saved yet today.", "आज अभी तक कोई बिल नहीं कटा है।");
     const split = [
-      day.cash && `Cash ${formatRupees(day.cash)}`,
+      day.cash && `cash ${formatRupees(day.cash)}`,
       day.upi && `UPI ${formatRupees(day.upi)}`,
-      day.udhaar && `Udhaar ${formatRupees(day.udhaar)}`,
+      day.udhaar && `credit ${formatRupees(day.udhaar)}`,
     ].filter(Boolean).join(", ");
     return answer(
-      `Aaj ${formatRupees(day.total)} ki sale hui. ${day.bills} bill. ${split}.`,
+      `Today's sales: ${formatRupees(day.total)} from ${day.bills} ${day.bills === 1 ? "bill" : "bills"}. Paid as ${split}.`,
       `आज ${rupees(day.total)} की बिक्री हुई।`,
     );
   }
   if (turn.query === "salesScope") {
-    return answer("Main aaj ki kul sale bata sakta hoon. Poochho, “Aaj kitni sale hui?”", "मैं आज की कुल बिक्री बता सकता हूँ। पूछें, आज कितनी बिक्री हुई?");
+    return answer("I can tell you today's total sales. Ask “Aaj kitni sale hui?” or “today sale”.", "मैं आज की कुल बिक्री बता सकता हूँ। पूछें, आज कितनी बिक्री हुई?");
   }
   if (turn.query === "topDebt") {
     const top = db.prepare("SELECT name, outstanding_paise AS outstanding FROM customers WHERE outstanding_paise > 0 ORDER BY outstanding_paise DESC, name LIMIT 1")
       .get() as { name: string; outstanding: number } | undefined;
     return top
-      ? answer(`Sabse zyada udhaar ${top.name} ka hai, ${formatRupees(top.outstanding)}.`, `सबसे ज़्यादा उधार ${top.name} का है, ${rupees(top.outstanding)}।`)
-      : answer("Kisi customer ka udhaar baaki nahi hai.", "किसी ग्राहक का उधार बाकी नहीं है।");
+      ? answer(`${top.name} owes the most: ${formatRupees(top.outstanding)}.`, `सबसे ज़्यादा उधार ${top.name} का है, ${rupees(top.outstanding)}।`)
+      : answer("No customer owes anything.", "किसी ग्राहक का उधार बाकी नहीं है।");
   }
   if (turn.query !== "khata") throw new Error("unknown voice question");
   const match = turn.name ? searchCustomers(db, spokenName(turn.name)) : null;
   if (match?.kind === "ambiguous") {
     const names = match.options.map(({ name }) => name).join(", ");
-    return answer(`Kaun sa customer? ${names}. Poora naam bolo.`, `कौन सा ग्राहक? ${names}। पूरा नाम बताइए।`, true);
+    return answer(`Which customer? ${names}. Please say the full name.`, `कौन सा ग्राहक? ${names}। पूरा नाम बताइए।`, true);
   }
-  if (match && match.kind !== "found") return answer("Customer ka naam nahi mila. Poora naam bolo.", "ग्राहक का नाम नहीं मिला। पूरा नाम बताइए।", true);
+  if (match && match.kind !== "found") return answer("Customer not found. Please say the full name.", "ग्राहक का नाम नहीं मिला। पूरा नाम बताइए।", true);
   const id = match?.customer.id ?? customerId;
   if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
-    return answer("Kiska hisaab bataun? Naam bolo.", "किसका हिसाब बताऊँ? नाम बोलें।", true);
+    return answer("Whose account should I tell you? Please say the name.", "किसका हिसाब बताऊँ? नाम बोलें।", true);
   }
   const account = getAccount(db, id);
   const balance = formatRupees(Math.abs(account.outstanding));
-  const label = account.outstanding < 0 ? "advance" : "udhaar";
   return answer(
-    `${account.name} ka ${label} ${balance} hai. Credit limit ${formatRupees(account.creditLimit)} hai.`,
+    account.outstanding < 0
+      ? `${account.name} has ${balance} in advance. Credit limit ${formatRupees(account.creditLimit)}.`
+      : `${account.name} owes ${balance}. Credit limit ${formatRupees(account.creditLimit)}.`,
     `${account.name} का ${account.outstanding < 0 ? "एडवांस" : "उधार"} ${rupees(Math.abs(account.outstanding))} है। क्रेडिट लिमिट ${rupees(account.creditLimit)} है।`,
   );
 }

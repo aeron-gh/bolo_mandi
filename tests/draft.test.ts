@@ -137,38 +137,38 @@ describe("readBackText", () => {
 
   it("B01: says the data sheet sentence", () => {
     expect(readBackText(B01)).toBe(
-      "Manat ka bill ₹25,000 hua. ₹4,000 cash receive hua aur ₹21,000 udhaar mein gaya. " +
-        "Manat ka total udhaar ab ₹33,500 hai. Bill kaat doon?",
+      "Manat's bill is ₹25,000. ₹4,000 cash received, ₹21,000 goes on credit. " +
+        "Manat's total credit is now ₹33,500. Save the bill?",
     );
   });
 
-  it("B02: says clearly when the full bill is udhaar", () => {
+  it("B02: says clearly when the full bill goes on credit", () => {
     const text = readBackText({ ...B01, customerName: "Sameer", total: rs(24000), cash: 0, udhaar: rs(24000), newOutstanding: rs(24000) });
-    expect(text).toContain("Poora ₹24,000 udhaar mein gaya.");
+    expect(text).toContain("All ₹24,000 goes on credit.");
   });
 
-  it("B05: full cash says no udhaar part", () => {
+  it("B05: full cash says no credit part", () => {
     const text = readBackText({ ...B01, customerName: "Anil", total: rs(9600), cash: rs(9600), udhaar: 0, newOutstanding: rs(22000) });
-    expect(text).toContain("₹9,600 cash receive hua.");
-    expect(text).not.toContain("udhaar mein gaya");
+    expect(text).toContain("₹9,600 cash received.");
+    expect(text).not.toContain("goes on credit");
   });
 
   it("P01: cash and UPI together", () => {
     const text = readBackText({ ...B01, cash: rs(10000), upi: rs(20000), udhaar: rs(18000) });
-    expect(text).toContain("₹10,000 cash aur ₹20,000 UPI receive hua aur ₹18,000 udhaar mein gaya.");
+    expect(text).toContain("₹10,000 cash and ₹20,000 UPI received, ₹18,000 goes on credit.");
   });
 
   it("C01: warns near the limit", () => {
-    expect(readBackText({ ...B01, credit: "near" })).toContain("Limit ke paas hai. Bill kaat doon?");
+    expect(readBackText({ ...B01, credit: "near" })).toContain("Close to the credit limit. Save the bill?");
   });
 
   it("C02: over the limit says by how much and asks again", () => {
     const text = readBackText({ ...B01, credit: "over", overBy: rs(6000) });
-    expect(text).toContain("Limit se ₹6,000 upar hai. Phir bhi kaat doon?");
+    expect(text).toContain("₹6,000 over the credit limit. Save the bill anyway?");
   });
 
   it("an advance left after the bill is said as advance", () => {
-    expect(readBackText({ ...B01, newOutstanding: -rs(5900) })).toContain("Manat ka ₹5,900 advance jama hai.");
+    expect(readBackText({ ...B01, newOutstanding: -rs(5900) })).toContain("Manat has ₹5,900 in advance.");
   });
 });
 
@@ -237,7 +237,7 @@ describe("paymentFor (quick payment buttons)", () => {
     expect(paymentFor("cash", rs(12000))).toEqual({ cash: rs(12000), upi: 0 });
     expect(paymentFor("upi", rs(12000))).toEqual({ cash: 0, upi: rs(12000) });
     expect(paymentFor("half", 1_200_001)).toEqual({ cash: 600_000, upi: 0 });
-    expect(paymentFor("udhaar", rs(12000))).toEqual({ cash: 0, upi: 0 });
+    expect(paymentFor("credit", rs(12000))).toEqual({ cash: 0, upi: 0 });
   });
 });
 

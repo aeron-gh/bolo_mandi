@@ -72,9 +72,9 @@ export function receiptText(bill: BillDetail, shop: ReceiptShop): string {
   lines.push("", `Total: ${r(bill.total)}`);
   if (bill.cash) lines.push(`Cash: ${r(bill.cash)}`);
   if (bill.upi) lines.push(`UPI: ${r(bill.upi)}`);
-  if (bill.udhaar) lines.push(`Udhaar: ${r(bill.udhaar)}`);
-  lines.push(bill.outstandingAfter < 0 ? `Advance jama: ${r(-bill.outstandingAfter)}` : `Kul udhaar ab: ${r(bill.outstandingAfter)}`);
-  lines.push("", "Dhanyavaad!");
+  if (bill.udhaar) lines.push(`On credit: ${r(bill.udhaar)}`);
+  lines.push(bill.outstandingAfter < 0 ? `Advance: ${r(-bill.outstandingAfter)}` : `Total credit now: ${r(bill.outstandingAfter)}`);
+  lines.push("", "Thank you!");
   return lines.join("\n");
 }
 

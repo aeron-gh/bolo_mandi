@@ -55,7 +55,7 @@ describe("profile API", () => {
     const token = unlock(db, NOW, { pin: "2580" });
     expect(() => changePin(db, token, NOW, { pin: "1111", currentPin: "0000" })).toThrow(/current/);
     changePin(db, token, NOW, { pin: "1111", currentPin: "2580" });
-    expect(() => unlock(db, NOW, { pin: "2580" })).toThrow(/galat/i);
+    expect(() => unlock(db, NOW, { pin: "2580" })).toThrow(/wrong pin/i);
   });
 });
 
@@ -65,7 +65,7 @@ describe("unlock and lock", () => {
   });
 
   it("gives a working session for the right PIN only", () => {
-    expect(() => unlock(db, NOW, { pin: "0000" })).toThrow(/galat/i);
+    expect(() => unlock(db, NOW, { pin: "0000" })).toThrow(/wrong pin/i);
     const token = unlock(db, NOW, { pin: "2580" });
     expect(token).toMatch(/^[0-9a-f]{64}$/);
     expect(ownerAllowed(db, token, NOW)).toBe(true);
@@ -74,8 +74,8 @@ describe("unlock and lock", () => {
   });
 
   it("pauses for 5 minutes after 5 wrong tries, even for the right PIN", () => {
-    for (let i = 0; i < 5; i++) expect(() => unlock(db, NOW, { pin: "0000" })).toThrow(/galat/i);
-    expect(() => unlock(db, after(1), { pin: "2580" })).toThrow(/5 minute/);
+    for (let i = 0; i < 5; i++) expect(() => unlock(db, NOW, { pin: "0000" })).toThrow(/wrong pin/i);
+    expect(() => unlock(db, after(1), { pin: "2580" })).toThrow(/5 minutes/);
     expect(unlock(db, after(6), { pin: "2580" })).toMatch(/^[0-9a-f]{64}$/);
   });
 });

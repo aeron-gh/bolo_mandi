@@ -31,7 +31,7 @@ describe("listCustomers", () => {
   });
 
   it("filters to customers who owe, or who are near or over their limit", () => {
-    expect(listCustomers(db, { filter: "udhaar" })).toHaveLength(9);
+    expect(listCustomers(db, { filter: "credit" })).toHaveLength(9);
     db.prepare("UPDATE customers SET outstanding_paise = ? WHERE name = 'Vikas'").run(rs(46000));
     db.prepare("UPDATE customers SET outstanding_paise = ? WHERE name = 'Anil'").run(rs(80000));
     const near = listCustomers(db, { filter: "limit" });
@@ -54,8 +54,8 @@ describe("updateCustomer", () => {
   });
 
   it("refuses a name another customer already has, or an empty one", () => {
-    expect(() => updateCustomer(db, id("Vikas"), { name: "afzal khan" })).toThrow(/pehle se/);
-    expect(() => updateCustomer(db, id("Vikas"), { name: "   " })).toThrow(/naam/);
+    expect(() => updateCustomer(db, id("Vikas"), { name: "afzal khan" })).toThrow(/already exists/);
+    expect(() => updateCustomer(db, id("Vikas"), { name: "   " })).toThrow(/name/);
     expect(updateCustomer(db, id("Vikas"), { name: "vikas" }).name).toBe("vikas");
   });
 

@@ -5,7 +5,7 @@ import { createUserSession, endUserSession, googleUser, logIn, openAccounts, sig
 const NOW = new Date("2026-11-19T06:30:00Z");
 const later = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000);
 const RAM = { name: "Ram Lal", email: " Ram@Example.com ", password: "mandi-1234" };
-const WRONG = "Email ya password galat hai";
+const WRONG = "Wrong email or password";
 
 let db: DatabaseSync;
 beforeEach(() => {
@@ -39,7 +39,7 @@ describe("log in", () => {
   it("pauses an email for 5 minutes after 5 wrong tries", () => {
     signUp(db, RAM, NOW);
     for (let i = 0; i < 5; i++) expect(() => logIn(db, { email: RAM.email, password: "wrong-pass" }, NOW)).toThrow(WRONG);
-    expect(() => logIn(db, { email: RAM.email, password: RAM.password }, later(1))).toThrow(/5 minute/);
+    expect(() => logIn(db, { email: RAM.email, password: RAM.password }, later(1))).toThrow(/5 minutes/);
     expect(logIn(db, { email: RAM.email, password: RAM.password }, later(6))).toMatchObject({ name: "Ram Lal" });
   });
 

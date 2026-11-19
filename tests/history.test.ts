@@ -79,7 +79,7 @@ describe("one bill", () => {
     const text = receiptText(getBill(db, billId)!, { shopName: "Ram Fruit Co", phone: "9876543210", address: "APMC Yard, Shed 4" });
     for (const line of [
       "*Ram Fruit Co*", "APMC Yard, Shed 4", "Mobile 9876543210", `Bill ${billId}, 19 Nov, 11:00 pm`, "Customer: Manat",
-      "Grade 1: 10 piece x ₹1,500 = ₹15,000", "Total: ₹15,000", "Cash: ₹4,000", "Udhaar: ₹11,000", "Kul udhaar ab: ₹23,500",
+      "Grade 1: 10 piece x ₹1,500 = ₹15,000", "Total: ₹15,000", "Cash: ₹4,000", "On credit: ₹11,000", "Total credit now: ₹23,500",
     ]) expect(text).toContain(line);
     expect(text).not.toContain("UPI");
   });

@@ -29,8 +29,8 @@ describe("previewBill", () => {
       customer: { name: "Manat", outstanding: rs(12500), creditLimit: rs(100000) },
     });
     expect(p.say).toBe(
-      "Manat ka bill ₹25,000 hua. ₹4,000 cash receive hua aur ₹21,000 udhaar mein gaya. " +
-        "Manat ka total udhaar ab ₹33,500 hai. Bill kaat doon?",
+      "Manat's bill is ₹25,000. ₹4,000 cash received, ₹21,000 goes on credit. " +
+        "Manat's total credit is now ₹33,500. Save the bill?",
     );
     expect(count("bills")).toBe(0);
   });
@@ -38,13 +38,13 @@ describe("previewBill", () => {
   it("P03: paying more than the bill asks wapas or advance", () => {
     const p = previewBill(db, RATES, { customerId: SAMEER, items: [{ grade: 2, qty: 2 }], cash: rs(5000) });
     expect(p).toMatchObject({ total: rs(2400), overpaidBy: rs(2600), udhaar: 0 });
-    expect(p.say).toBe("₹2,600 zyada mila hai. Wapas dena hai ya advance rakhna hai?");
+    expect(p.say).toBe("₹2,600 more than the bill was paid. Give it back or keep it as advance?");
   });
 
   it("C02: over the limit shows how much and asks again", () => {
     const p = previewBill(db, RATES, { customerId: VIKAS, items: [{ grade: 2, qty: 40 }] });
     expect(p).toMatchObject({ credit: "over", overBy: rs(6000), newOutstanding: rs(56000) });
-    expect(p.say).toMatch(/Phir bhi kaat doon\?$/);
+    expect(p.say).toMatch(/Save the bill anyway\?$/);
   });
 
   it("R06: Manat 8 grade 2 comes to ₹9,600, new udhaar ₹22,100", () => {

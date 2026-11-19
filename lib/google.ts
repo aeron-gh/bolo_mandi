@@ -53,7 +53,7 @@ export async function exchangeCode(cfg: GoogleConfig, code: string, verifier: st
     }).toString(),
   });
   const data = (await res.json().catch(() => ({}))) as { id_token?: unknown };
-  if (!res.ok || typeof data.id_token !== "string") throw new Error("Google login fail hua");
+  if (!res.ok || typeof data.id_token !== "string") throw new Error("Google sign-in failed");
   return data.id_token;
 }
 
@@ -61,12 +61,12 @@ export async function exchangeCode(cfg: GoogleConfig, code: string, verifier: st
 // token endpoint over TLS, which OpenID Connect Core 3.1.3.7 allows in place of a signature check.
 export function checkIdToken(idToken: string, expect: { clientId: string; nonce: string; now: Date }): GoogleProfile {
   const parts = idToken.split(".");
-  if (parts.length !== 3) throw new Error("Google token sahi nahi hai");
+  if (parts.length !== 3) throw new Error("Google token is not valid");
   let claims: Record<string, unknown>;
   try {
     claims = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
   } catch {
-    throw new Error("Google token sahi nahi hai");
+    throw new Error("Google token is not valid");
   }
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!ISSUERS.includes(String(claims.iss))) throw new Error("Google token: wrong issuer");
