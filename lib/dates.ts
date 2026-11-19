@@ -19,3 +19,9 @@ export function indiaDayLabel(day: string): string {
   const [year, month, date] = day.split("-").map(Number);
   return `${date} ${MONTHS[month - 1]} ${year}`;
 }
+
+// "2026-11-20" -> "20 Nov"
+export function shortDay(day: string): string {
+  const [, month, date] = day.split("-").map(Number);
+  return `${date} ${MONTHS[month - 1]}`;
+}

@@ -6,6 +6,6 @@ import { getRates } from "@/lib/shop.ts";
 export async function POST(req: Request) {
   return reply(async () => {
     const { db } = shopFor(req);
-    return voiceBill(db, getRates(db), await req.json());
+    return voiceBill(db, getRates(db), await req.json(), new Date());
   });
 }

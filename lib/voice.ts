@@ -13,7 +13,11 @@ export type VoiceTurn =
   | { kind: "question"; query: "khata"; name?: string }
   | { kind: "question"; query: "sales" | "salesScope" | "topDebt" }
   | { kind: "repeat"; reason: "unclear" | "payment" | "line" }
-  | { kind: "edit"; name?: string; entries: BillEntries; followUp?: FollowUp | null };
+  | { kind: "edit"; name?: string; entries: BillEntries; followUp?: FollowUp | null }
+  | { kind: "payment"; name: string; amount: number | null; mode: "cash" | "upi" | null }
+  | { kind: "promise"; name: string; amount: number | null; due: "aaj" | "kal" | "parso" | null }
+  | { kind: "deny" };
+export type LedgerTurn = Extract<VoiceTurn, { kind: "payment" | "promise" }>;
 
 const WORDS: Record<string, string> = Object.create(null);
 for (const group of [
@@ -31,6 +35,9 @@ for (const group of [
   "aaj आज", "kitni कितनी", "kitna कितना", "sale sales सेल सेल्स बिक्री बिकरी bikri", "hui हुई हुयी हुईं huyi",
   "hisaab hisab हिसाब", "bata batao बताओ बता बताइए", "limit लिमिट सीमा",
   "iska इसका", "inka इनका", "sabse सबसे", "zyada zyadaa jyada ज्यादा ज़्यादा", "kiska किसका",
+  "ne ने", "vasooli vasuli wasooli wasuli वसूली", "jama जमा", "dega degi denge देगा देगी देंगे", "dene देने",
+  "vaada vada wada वादा", "kal कल", "parso parson परसों", "mile मिले", "mila मिला", "kiya किया", "tak तक",
+  "liya लिया", "ho हो", "gayi gai गयी गई", "gaya गया", "hue हुए",
   "lakh lac लाख", "sau सौ", "dedh डेढ़ डेढ़", "dhai ढाई", "saadhe sadhe साढ़े साढ़े",
   "1 ek one एक", "2 two", "3 teen three तीन", "4 char chaar four चार",
   "5 panch paanch five पांच पाँच", "6 che chhe six छह छः", "7 saat seven सात", "8 aath eight आठ",
@@ -181,6 +188,60 @@ function isDailySales(text: string): boolean {
   return /^how much (?:did (?:we|i) sell|sale|were (?:the |our )?sale) aaj$/.test(question);
 }
 
+// Vasooli ("Manat ne 5000 cash diye") and promises ("Manat kal 5000 dega").
+// Strict on purpose: one unknown word and the sentence goes to the bill parser instead,
+// so a misheard sentence asks again rather than writing a wrong khata line.
+const NUMBER_WORD = /^(?:\d+|hazaar|lakh|sau|dedh|dhai|saadhe)$/;
+const LEDGER_WORDS = new Set([
+  "ne", "se", "ka", "ki", "ko", "tak", "rupaye", ",", "cash", "upi", "mein", "diye", "diya", "de", "mile", "mila",
+  "aaye", "aaya", "hai", "hain", "vasooli", "jama", "hui", "hue", "ho", "gayi", "gaya", "kar", "karo", "likh",
+  "likho", "dega", "dene", "vaada", "kiya", "paise", "kuch", "aaj", "kal", "parso",
+]);
+const PAID = new Set(["diye", "diya", "mile", "mila", "aaye", "aaya"]);
+const NAME_ENDS = new Set(["ne", "se", "ka", "ki", "ko", "aaj", "kal", "parso", ","]);
+
+function isNumber(tokens: string[], i: number): boolean {
+  return NUMBER_WORD.test(tokens[i]) || (tokens[i] === "do" && /^(?:hazaar|lakh|sau)$/.test(tokens[i + 1] ?? ""));
+}
+
+function ledgerTurn(command: string, billOpen: boolean): LedgerTurn | null {
+  const tokens = command.split(" ");
+  const promise = tokens.includes("dega") || tokens.includes("vaada");
+  // "diye" during an open bill is that bill's payment; "vasooli" or "jama" always means khata.
+  const paid = tokens.includes("vasooli") || tokens.includes("jama")
+    || (!billOpen && tokens.some((t) => PAID.has(t)) && (tokens.includes("ne") || tokens.includes("se")));
+  if (promise === paid) return null;
+
+  let i = 0;
+  const name: string[] = [];
+  while (i < tokens.length && !NAME_ENDS.has(tokens[i]) && !isNumber(tokens, i)) name.push(tokens[i++]);
+  if (name.length === 0 || name.length > 4 || name.some((word) => LEDGER_WORDS.has(word) || /\d/.test(word))) return null;
+
+  let amountWords: string[] | null = null;
+  let mode: "cash" | "upi" | null = null;
+  let due: "aaj" | "kal" | "parso" | null = null;
+  for (; i < tokens.length; i++) {
+    if (isNumber(tokens, i)) {
+      if (amountWords) return null; // two amounts: ask again
+      amountWords = [];
+      while (i < tokens.length && isNumber(tokens, i)) amountWords.push(tokens[i++]);
+      i--;
+      continue;
+    }
+    const token = tokens[i];
+    if (!LEDGER_WORDS.has(token)) return null;
+    if (token === "cash" || token === "upi") {
+      if (mode && mode !== token) return null;
+      mode = token;
+    }
+    if (token === "aaj" || token === "kal" || token === "parso") due ??= token;
+  }
+  const amount = amountWords ? paise(amountWords.join(" ")) : null;
+  if (amountWords && !amount) return null;
+  const who = name.join(" ");
+  return promise ? { kind: "promise", name: who, amount, due } : { kind: "payment", name: who, amount, mode };
+}
+
 export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean, pending?: FollowUp, accountQuestion = false): VoiceTurn {
   if (!clearSpeech(text)) return { kind: "repeat", reason: "unclear" };
   let command = normalize(text).replace(/^arre /, "");
@@ -190,6 +251,7 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
   if (/(?:^| , )(?:rehne do(?: , )?)?(?:bill )?cancel(?: kar| kar do)?$|^rehne do$/.test(command)) {
     return { kind: "cancel" };
   }
+  if (/^(?:nahi(?: nahi)?|mat likho|nahi likho|na)$/.test(command)) return { kind: "deny" };
   if (/^(?:bill banao|bill padho|dobara padho|phir se padho)$/.test(command)) return { kind: "review" };
   if (/\b(?:sale|sell)\b/.test(command) && isDailySales(text)) return { kind: "question", query: "sales" };
   if (/^sabse zyada udhaar kiska(?: hai)?$/.test(command)) return { kind: "question", query: "topDebt" };
@@ -198,6 +260,9 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
   if (/^(?:(?:iska|inka) )?(?:hisaab|udhaar|limit)(?: bata| kitna hai)$|^kitna udhaar hai$/.test(command)) {
     return { kind: "question", query: "khata" };
   }
+
+  const ledger = ledgerTurn(command, current.items.length > 0);
+  if (ledger) return ledger;
 
   if (pending?.kind === "grade") {
     const label = command.match(new RegExp(`^${GRADE_LABEL}$`));

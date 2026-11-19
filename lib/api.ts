@@ -6,11 +6,14 @@ import {
   type BillLine, type CreditStatus, type Grade, type ItemInput, type RateCard, type SaveResult,
 } from "./billing.ts";
 import { addCustomer, findCustomer, getAccount, loadCustomers, type Account, type Customer, type CustomerMatch } from "./customers.ts";
-import { getKhata, type Khata } from "./ledger.ts";
+import { dueDate, getKhata, type Khata } from "./ledger.ts";
 import { formatRupees } from "./money.ts";
 import { readBackText } from "./readback.ts";
 import { spokenName } from "./spoken-name.ts";
-import { interpretVoice, type BillEntries, type FollowUp, type VoiceTurn } from "./voice.ts";
+import {
+  advanceQuestion, askDue, askPaymentAmount, askPromiseAmount, notFound, paymentQuestion, promiseQuestion, whoIsIt, type Say,
+} from "./talk.ts";
+import { interpretVoice, type BillEntries, type FollowUp, type LedgerTurn, type VoiceTurn } from "./voice.ts";
 
 type BillRequest = { customerId: number; items: ItemInput[]; cash: number; upi: number };
 
@@ -92,7 +95,35 @@ export function searchCustomers(db: DatabaseSync, q: string | null): CustomerMat
 
 type VoiceQuestion = Extract<VoiceTurn, { kind: "question" }>;
 type VoiceAnswer = { kind: "answer"; text: string; speech: string; needsName?: true };
-export type VoiceBillResult = (Exclude<VoiceTurn, VoiceQuestion> & { match?: CustomerMatch }) | VoiceAnswer;
+// A khata task Bolo has heard and checked; it is saved only after the owner says "haan".
+export type LedgerTask =
+  | { action: "payment"; customerId: number; name: string; amount: number; mode: "cash" | "upi" | null; allowAdvance: boolean }
+  | { action: "promise"; customerId: number; name: string; amount: number; due: string };
+export type VoiceTask = { kind: "task"; task: LedgerTask | null } & Say;
+export type VoiceBillResult = (Exclude<VoiceTurn, VoiceQuestion | LedgerTurn> & { match?: CustomerMatch }) | VoiceAnswer | VoiceTask;
+
+// Find the customer and say the task back. Anything missing becomes a question, never a guess.
+function ledgerTask(db: DatabaseSync, turn: LedgerTurn, now: Date): VoiceTask {
+  const ask = (say: Say): VoiceTask => ({ kind: "task", task: null, ...say });
+  const heard = spokenName(turn.name);
+  const match = searchCustomers(db, heard);
+  if (match.kind === "ambiguous") return ask(whoIsIt(heard, match.options.map(({ name }) => name)));
+  if (match.kind !== "found") return ask(notFound(heard));
+  const { id, name, outstanding } = getAccount(db, match.customer.id);
+  if (turn.amount === null) return ask(turn.kind === "payment" ? askPaymentAmount(name) : askPromiseAmount(name));
+  if (turn.kind === "promise") {
+    if (!turn.due) return ask(askDue(name));
+    const due = dueDate(turn.due, now);
+    const task: LedgerTask = { action: "promise", customerId: id, name, amount: turn.amount, due };
+    return { kind: "task", task, ...promiseQuestion({ name, amount: turn.amount, dueWord: turn.due, dueDate: due }) };
+  }
+  const extra = turn.amount - Math.max(0, outstanding);
+  const say = extra > 0
+    ? advanceQuestion({ name, before: outstanding, extra })
+    : paymentQuestion({ name, amount: turn.amount, mode: turn.mode, before: outstanding, after: outstanding - turn.amount });
+  const task: LedgerTask = { action: "payment", customerId: id, name, amount: turn.amount, mode: turn.mode, allowAdvance: extra > 0 };
+  return { kind: "task", task, ...say };
+}
 
 function answerVoice(db: DatabaseSync, turn: VoiceQuestion, customerId: unknown): VoiceAnswer {
   const answer = (text: string, speech: string, needsName?: true): VoiceAnswer => ({ kind: "answer", text, speech, needsName });
@@ -147,7 +178,7 @@ function answerVoice(db: DatabaseSync, turn: VoiceQuestion, customerId: unknown)
 }
 
 // Interpret and look up a name in one request. The voice endpoint never writes.
-export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): VoiceBillResult {
+export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown, now = new Date()): VoiceBillResult {
   const raw = asBody(body);
   if (typeof raw.words !== "string" || raw.words.length > 2000) throw new Error("unclear voice input");
   const { items, cash, upi }: BillEntries = parseBill({ ...raw, customerId: 0 });
@@ -162,6 +193,7 @@ export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): Voi
     }
   }
   const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true, followUp, raw.accountQuestion === true);
+  if (turn.kind === "payment" || turn.kind === "promise") return ledgerTask(db, turn, now);
   if (turn.kind === "question") return answerVoice(db, turn, raw.customerId);
   if (turn.kind !== "edit" || !turn.name) return turn;
   const name = spokenName(turn.name);
