@@ -108,45 +108,98 @@ export function recordPromise(db: DatabaseSync, p: PromiseDraft): PromiseResult 
 }
 
 export type KhataLine = {
-  kind: "opening" | "bill" | "payment";
+  id: number;
+  kind: "opening" | "bill" | "payment" | "adjustment";
   mode: Mode | null;
+  note: string | null;
   amount: number;
   balanceAfter: number;
   billId: number | null;
   createdAt: string;
 };
 
+export type OpenPromise = { id: number; amount: number; dueDate: string; overdue: boolean };
+
 export type Khata = {
   customer: Customer;
+  phone: string;
   outstanding: number;
   creditLimit: number;
   creditLeft: number;
   entries: KhataLine[];
-  openPromises: { amount: number; dueDate: string }[];
+  openPromises: OpenPromise[];
 };
 
 // Everything needed to speak, show or print one customer's khata.
-export function getKhata(db: DatabaseSync, customerId: number): Khata {
+// A promise is overdue once its date has passed in India.
+export function getKhata(db: DatabaseSync, customerId: number, now = new Date()): Khata {
   const account = getAccount(db, customerId);
+  const { phone } = db.prepare("SELECT COALESCE(phone, '') AS phone FROM customers WHERE id = ?").get(customerId) as { phone: string };
   const entries = db
     .prepare(
-      `SELECT kind, mode, amount_paise AS amount, balance_after_paise AS balanceAfter,
+      `SELECT id, kind, mode, note, amount_paise AS amount, balance_after_paise AS balanceAfter,
               bill_id AS billId, created_at AS createdAt
        FROM ledger_entries WHERE customer_id = ? ORDER BY id`,
     )
     .all(customerId) as KhataLine[];
-  const openPromises = db
+  const today = indiaToday(now);
+  const openPromises = (db
     .prepare(
-      `SELECT amount_paise AS amount, due_date AS dueDate
+      `SELECT id, amount_paise AS amount, due_date AS dueDate
        FROM promises WHERE customer_id = ? AND status = 'open' ORDER BY due_date, id`,
     )
-    .all(customerId) as Khata["openPromises"];
+    .all(customerId) as Omit<OpenPromise, "overdue">[])
+    .map((p) => ({ ...p, overdue: p.dueDate < today }));
   return {
     customer: { id: account.id, name: account.name },
+    phone,
     outstanding: account.outstanding,
     creditLimit: account.creditLimit,
     creditLeft: checkCreditLimit(account.outstanding, 0, account.creditLimit).creditLeft,
     entries,
     openPromises,
   };
+}
+
+export type AdjustmentDraft = { draftId: string; customerId: number; amount: number; note: string };
+export type AdjustmentResult = { entryId: number; duplicate: boolean; amount: number; note: string; newOutstanding: number };
+
+type AdjustmentRow = { id: number; kind: string; amount_paise: number; note: string | null; balance_after_paise: number };
+
+// Fix a mistake with a new line that says why. Past lines are never edited or deleted.
+// Plus means the customer owes more; minus means less.
+export function recordAdjustment(db: DatabaseSync, a: AdjustmentDraft): AdjustmentResult {
+  if (!Number.isSafeInteger(a.amount) || a.amount === 0) throw new Error(`bad amount: ${a.amount}`);
+  const note = a.note.trim().replace(/\s+/g, " ");
+  if (!note) throw new Error("note chahiye: kyun badla?");
+  if (note.length > 120) throw new Error("note bahut lamba hai (120 akshar tak)");
+  return inTransaction(db, () => {
+    const existing = db.prepare("SELECT id, kind, amount_paise, note, balance_after_paise FROM ledger_entries WHERE draft_id = ?")
+      .get(a.draftId) as AdjustmentRow | undefined;
+    if (existing) {
+      if (existing.kind !== "adjustment") throw new Error("draft id already used");
+      return { entryId: existing.id, duplicate: true, amount: existing.amount_paise, note: existing.note ?? "", newOutstanding: existing.balance_after_paise };
+    }
+    const account = getAccount(db, a.customerId);
+    const balance = account.outstanding + a.amount;
+    const { lastInsertRowid } = db
+      .prepare(
+        `INSERT INTO ledger_entries (customer_id, draft_id, kind, note, amount_paise, balance_after_paise)
+         VALUES (?, ?, 'adjustment', ?, ?, ?)`,
+      )
+      .run(account.id, a.draftId, note, a.amount, balance);
+    db.prepare("UPDATE customers SET outstanding_paise = ? WHERE id = ?").run(balance, account.id);
+    return { entryId: Number(lastInsertRowid), duplicate: false, amount: a.amount, note, newOutstanding: balance };
+  });
+}
+
+export type PromiseStatus = "kept" | "broken";
+
+// A promise is marked once: kept or broken. It never changes the outstanding.
+export function setPromiseStatus(db: DatabaseSync, promiseId: number, status: PromiseStatus): { id: number; status: PromiseStatus } {
+  const row = db.prepare("SELECT status FROM promises WHERE id = ?").get(promiseId) as { status: string } | undefined;
+  if (!row) throw new Error(`unknown promise: ${promiseId}`);
+  if (row.status !== "open") throw new Error("sirf open vaada badla ja sakta hai");
+  db.prepare("UPDATE promises SET status = ? WHERE id = ? AND status = 'open'").run(status, promiseId);
+  return { id: promiseId, status };
 }

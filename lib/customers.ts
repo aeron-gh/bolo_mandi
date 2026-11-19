@@ -1,6 +1,7 @@
 // Customer search. Never guess: one match is found, more than one means ask.
 import type { DatabaseSync } from "node:sqlite";
 import { inTransaction } from "./db.ts";
+import { cleanPhone } from "./shop.ts";
 
 export type Customer = { id: number; name: string };
 
@@ -134,5 +135,37 @@ export function addCustomer(db: DatabaseSync, text: string, creditLimit = 0): Cu
       "INSERT INTO ledger_entries (customer_id, kind, amount_paise, balance_after_paise) VALUES (?, 'opening', 0, 0)",
     ).run(id);
     return { id, name };
+  });
+}
+
+const MAX_LIMIT = 1_000_000_000; // ₹1 crore in paise
+
+// A credit limit is whole rupees, from ₹0 to ₹1 crore.
+export function checkLimit(paise: number): number {
+  if (!Number.isSafeInteger(paise) || paise < 0 || paise > MAX_LIMIT || paise % 100 !== 0) {
+    throw new Error("limit poore rupaye mein ho, ₹0 se ₹1 crore tak");
+  }
+  return paise;
+}
+
+export type CustomerEdit = { name?: string; phone?: string; creditLimit?: number };
+
+// Fix a name, phone or limit. Two customers can never share a name, so search stays unambiguous.
+export function updateCustomer(db: DatabaseSync, id: number, edit: CustomerEdit): Account {
+  return inTransaction(db, () => {
+    const current = getAccount(db, id);
+    const name = edit.name === undefined ? current.name : edit.name.trim().replace(/\s+/g, " ");
+    if (!cleanName(name)) throw new Error("naam chahiye");
+    if (name.length > 60) throw new Error("naam bahut lamba hai (60 akshar tak)");
+    const key = cleanName(name);
+    if (loadCustomers(db).some((c) => c.id !== id && cleanName(c.name) === key)) {
+      throw new Error("is naam ka customer pehle se hai");
+    }
+    const limit = edit.creditLimit === undefined ? current.creditLimit : checkLimit(edit.creditLimit);
+    db.prepare("UPDATE customers SET name = ?, credit_limit_paise = ? WHERE id = ?").run(name, limit, id);
+    if (edit.phone !== undefined) {
+      db.prepare("UPDATE customers SET phone = ? WHERE id = ?").run(cleanPhone(edit.phone) || null, id);
+    }
+    return getAccount(db, id);
   });
 }

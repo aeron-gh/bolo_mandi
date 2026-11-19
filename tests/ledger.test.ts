@@ -177,7 +177,7 @@ describe("getKhata", () => {
     expect(khata.entries.map((e) => e.kind)).toEqual(["opening", "bill", "payment", "payment"]);
     expect(khata.entries.at(-1)?.balanceAfter).toBe(khata.outstanding);
     expect(khata.outstanding).toBe(rs(18500)); // 12,500 + 15,000 bill - 4,000 cash - 5,000 UPI
-    expect(khata.openPromises).toEqual([{ amount: rs(10000), dueDate: "2026-11-20" }]);
+    expect(khata.openPromises).toMatchObject([{ amount: rs(10000), dueDate: "2026-11-20" }]);
   });
 
   it("never reads the khata of an unknown customer", () => {
