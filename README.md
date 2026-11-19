@@ -9,7 +9,7 @@ updates the khata.
 ## Status
 
 - [x] Billing core: bill maths, payment split, credit limit check, one-time bill save
-- [ ] Customer search with fuzzy names ("Afzal" -> ask which one)
+- [x] Customer search with fuzzy names ("Afzal" -> ask which one)
 - [ ] Vasooli and payment promises
 - [ ] Bill screen
 - [ ] Voice in and out
