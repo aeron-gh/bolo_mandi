@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rs } from "../lib/money.ts";
-import { newDraft, newDraftId, billReducer, restoreDraft, startDraft, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
+import { newDraft, newDraftId, billReducer, openEntries, restoreDraft, startDraft, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
 import { readBackText, type ReadBackInput } from "../lib/readback.ts";
 
 const MANAT = { id: 1, name: "Manat" };
@@ -214,5 +214,20 @@ describe("startDraft (what the counter shows first)", () => {
 
   it("starts empty otherwise", () => {
     expect(startDraft("junk", null)).toEqual({ draft: newDraft(), note: null });
+  });
+});
+
+describe("openEntries (what voice treats as the bill in progress)", () => {
+  const lines = { ...newDraft(), customer: MANAT, items: [{ grade: 1 as const, qty: 10 }], cash: rs(500) };
+
+  it("is the bill's lines and payment while it is open", () => {
+    expect(openEntries(lines)).toEqual({ items: [{ grade: 1, qty: 10 }], cash: rs(500), upi: 0 });
+    expect(openEntries({ ...lines, state: "AWAITING_CONFIRM" }).items).toHaveLength(1);
+  });
+
+  it("is empty once the bill is saved or cancelled, so 'Manat ne 5000 diye' becomes vasooli", () => {
+    for (const state of ["SAVED", "CANCELLED"] as const) {
+      expect(openEntries({ ...lines, state })).toEqual({ items: [], cash: 0, upi: 0 });
+    }
   });
 });

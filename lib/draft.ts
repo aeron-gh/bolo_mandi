@@ -121,3 +121,10 @@ export function startDraft(saved: unknown, customer: Customer | null): { draft: 
   if (customer) return { draft: { ...newDraft(), customer }, note: "customer" };
   return { draft: newDraft(), note: null };
 }
+
+// What voice treats as the bill in progress. A saved or cancelled bill is closed, so its lines
+// must not count: otherwise "Manat ne 5000 diye" right after a sale is read as that sale's payment.
+export function openEntries(draft: BillDraft): { items: ItemInput[]; cash: number; upi: number } {
+  if (draft.state === "SAVED" || draft.state === "CANCELLED") return { items: [], cash: 0, upi: 0 };
+  return { items: draft.items, cash: draft.cash, upi: draft.upi };
+}

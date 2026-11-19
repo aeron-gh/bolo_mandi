@@ -7,7 +7,7 @@ import { Drawer } from "vaul";
 import type { BillPreview, LedgerTask } from "@/lib/api.ts";
 import type { RateCard } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
-import { billReducer, newDraft, newDraftId, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
+import { billReducer, newDraft, newDraftId, openEntries, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
 import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
 import { advanceQuestion, DROPPED, paymentDone, promiseDone, type Say } from "@/lib/talk.ts";
@@ -296,7 +296,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     const controller = new AbortController();
     voiceRequest.current = controller;
     try {
-      const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, draft.customer?.id ?? null, followUp, accountQuestion, controller.signal);
+      const turn = await interpretBill(text, openEntries(draft), draft.customer?.id ?? null, followUp, accountQuestion, controller.signal);
       if (controller.signal.aborted) return;
       if (turn.kind !== "repeat") setAccountQuestion(turn.kind === "answer" && Boolean(turn.needsName));
       // A new bill line or question means the owner moved on: drop the waiting vasooli or vaada.
@@ -379,7 +379,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const { action, hint } = mainAction(draft, { preview: preview?.data ?? null, fresh }, saving);
   const run = locked ? onNewBill : draft.state === "AWAITING_CONFIRM" ? () => void confirm() : review;
   const question = draft.state === "AWAITING_CONFIRM" && fresh
-    ? preview?.data.credit === "over" ? "Limit se upar hai. Phir bhi bill kaat doon?" : "Hisaab dekh lo. Bill kaat doon?"
+    ? preview?.data.credit === "over" ? "Limit se upar hai. Phir bhi bill kaat doon?" : "Hisaab dekh lijiye. Bill kaat doon?"
     : null;
   const customerQuestion = suggestion?.match.kind === "ambiguous"
     ? `Kaun se ${suggestion.name}? Poora naam boliye, ya list se chun lijiye.`
