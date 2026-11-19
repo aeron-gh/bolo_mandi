@@ -12,7 +12,7 @@ import { dailyBackup } from "./backup.ts";
 import { loadSeed, openDb, readSeed } from "./db.ts";
 import { indiaDay } from "./history.ts";
 import { PinRequired, tokenFromCookie } from "./shop-api.ts";
-import { ACCOUNTS_FILE, backupDir, cookieValue, crossSite, DEMO_FILE, shopFile } from "./shops.ts";
+import { ACCOUNTS_FILE, backupDir, cookieValue, crossSite, DEMO_FILE, secureCookies, shopFile } from "./shops.ts";
 
 export const USER_COOKIE = "bolo_user";
 export const DEMO_COOKIE = "bolo_demo";
@@ -122,9 +122,9 @@ export function ownerToken(req: Request): string | null {
   return tokenFromCookie(req.headers.get("cookie"));
 }
 
-// Cookie settings: httpOnly, same-site, secure on https only (so localhost still works).
+// Cookie settings: httpOnly, same-site, and https-only whenever the app is reached over https.
 export function cookieOptions(req: Request, maxAgeSeconds: number) {
-  return { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: maxAgeSeconds, secure: new URL(req.url).protocol === "https:" };
+  return { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: maxAgeSeconds, secure: secureCookies(req.url, process.env.APP_ORIGIN) };
 }
 
 // Missing login or PIN become 401, any other error a 400 with a short message.

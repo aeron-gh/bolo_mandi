@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cookieValue, crossSite, DEMO_FILE, shopFile } from "../lib/shops.ts";
+import { cookieValue, crossSite, DEMO_FILE, secureCookies, shopFile } from "../lib/shops.ts";
 
 describe("shop files", () => {
   it("each account gets its own file under shops/", () => {
@@ -38,5 +38,17 @@ describe("crossSite", () => {
   it("uses APP_ORIGIN behind a proxy", () => {
     expect(crossSite(h({ origin: "https://bolo.in", host: "127.0.0.1:3000" }), "https://bolo.in")).toBe(false);
     expect(crossSite(h({ origin: "https://evil.example", host: "127.0.0.1:3000" }), "https://bolo.in")).toBe(true);
+  });
+});
+
+describe("secureCookies", () => {
+  it("marks cookies https-only on https, including behind a proxy that talks plain http to the app", () => {
+    expect(secureCookies("https://bolo.in/api/auth/login")).toBe(true);
+    expect(secureCookies("http://127.0.0.1:3000/api/auth/login", "https://bolo.in")).toBe(true);
+  });
+
+  it("keeps plain http working on a laptop", () => {
+    expect(secureCookies("http://localhost:3000/api/auth/login")).toBe(false);
+    expect(secureCookies("http://localhost:3000/api/auth/login", "http://localhost:3000")).toBe(false);
   });
 });

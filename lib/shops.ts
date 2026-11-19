@@ -41,3 +41,9 @@ export function backupDir(userId: number): string {
   shopFile(userId); // same id check
   return path.join(DATA_DIR, "backups", String(userId));
 }
+
+// Cookies are https-only when people reach the app over https. Behind a proxy the app itself sees
+// plain http, so the public address (APP_ORIGIN) counts too.
+export function secureCookies(requestUrl: string, appOrigin?: string): boolean {
+  return [requestUrl, appOrigin].some((url) => url && new URL(url).protocol === "https:");
+}
