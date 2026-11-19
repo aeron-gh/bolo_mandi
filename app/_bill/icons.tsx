@@ -31,6 +31,14 @@ const paths = {
   book: "M12 5v15M3 4c4-1 7-1 9 1 2-2 5-2 9-1v14c-4-1-7-1-9 1-2-2-5-2-9-1V4Z",
   chevron: "m9 18 6-6-6-6",
   speaker: "m11 5-5 4H3v6h3l5 4V5Zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14",
+  clock: "M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  lock: "M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4",
+  logout: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3",
+  search: "m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z",
+  plus: "M12 5v14M5 12h14",
+  phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z",
+  print: "M6 9V3h12v6M6 18H4v-7h16v7h-2M6 14h12v7H6z",
+  share: "M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13",
 };
 
 export function Icon({ name, className = "size-5" }: IconProps & { name: keyof typeof paths }) {

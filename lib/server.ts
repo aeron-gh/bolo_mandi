@@ -6,6 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { cache } from "react";
 import { openAccounts, userForSession, type User } from "./accounts.ts";
 import { loadSeed, openDb, readSeed } from "./db.ts";
 import { PinRequired, tokenFromCookie } from "./shop-api.ts";
@@ -25,7 +26,7 @@ export class LoginRequired extends Error {
 }
 
 // Open handles survive hot reload in dev, so each file is opened once.
-const cache = globalThis as typeof globalThis & { boloShops?: Map<string, DatabaseSync>; boloAccounts?: DatabaseSync };
+const handles = globalThis as typeof globalThis & { boloShops?: Map<string, DatabaseSync>; boloAccounts?: DatabaseSync };
 
 function openFile(file: string): DatabaseSync {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -33,23 +34,23 @@ function openFile(file: string): DatabaseSync {
 }
 
 function shopDb(file: string, seedIfEmpty: boolean): DatabaseSync {
-  cache.boloShops ??= new Map();
-  let db = cache.boloShops.get(file);
+  handles.boloShops ??= new Map();
+  let db = handles.boloShops.get(file);
   if (!db) {
     db = openFile(file);
     const { n } = db.prepare("SELECT COUNT(*) AS n FROM customers").get() as { n: number };
     if (seedIfEmpty && n === 0) loadSeed(db, readSeed());
-    cache.boloShops.set(file, db);
+    handles.boloShops.set(file, db);
   }
   return db;
 }
 
 export function accountsDb(): DatabaseSync {
-  if (!cache.boloAccounts) {
+  if (!handles.boloAccounts) {
     mkdirSync(path.dirname(ACCOUNTS_FILE), { recursive: true });
-    cache.boloAccounts = openAccounts(ACCOUNTS_FILE);
+    handles.boloAccounts = openAccounts(ACCOUNTS_FILE);
   }
-  return cache.boloAccounts;
+  return handles.boloAccounts;
 }
 
 // A user's own shop: empty at first (no sample customers), prices from the data sheet.
@@ -59,8 +60,8 @@ export function userShopDb(userId: number): DatabaseSync {
 
 // Start the demo shop again from the data sheet.
 export function resetDemo(): void {
-  cache.boloShops?.get(DEMO_FILE)?.close();
-  cache.boloShops?.delete(DEMO_FILE);
+  handles.boloShops?.get(DEMO_FILE)?.close();
+  handles.boloShops?.delete(DEMO_FILE);
   for (const suffix of ["", "-wal", "-shm"]) rmSync(DEMO_FILE + suffix, { force: true });
   shopDb(DEMO_FILE, true);
 }
@@ -88,12 +89,13 @@ export async function currentShop(): Promise<ShopContext> {
   return context;
 }
 
-export async function signedInShop(): Promise<ShopContext | null> {
+// Checked once per request, even when the layout and the page both ask.
+export const signedInShop = cache(async (): Promise<ShopContext | null> => {
   // The login check reads the clock, so it must run per request, never while prerendering.
   await connection();
   const store = await cookies();
   return contextFrom((name) => store.get(name)?.value ?? null);
-}
+});
 
 // The owner's PIN unlock token from the request's cookies, if any.
 export function ownerToken(req: Request): string | null {
