@@ -1,16 +1,20 @@
 // Interpret one finalized mic turn. The caller owns the draft and confirmation.
 import { calculateBill, type Grade, type ItemInput, type RateCard, type Unit } from "./billing.ts";
 import { rs } from "./money.ts";
+import { clearSpeech } from "./voice-text.ts";
 
 export type BillEntries = { items: ItemInput[]; cash: number; upi: number };
+export type FollowUp =
+  | { kind: "grade"; qty: number; unit: Unit }
+  | { kind: "payment"; mode?: "cash" | "upi" };
 export type VoiceTurn =
   | { kind: "confirm" | "review" | "cancel" }
   | { kind: "repeat"; reason: "unclear" | "payment" | "line" }
-  | { kind: "edit"; name?: string; entries: BillEntries };
+  | { kind: "edit"; name?: string; entries: BillEntries; followUp?: FollowUp | null };
 
 const WORDS: Record<string, string> = Object.create(null);
 for (const group of [
-  "grade ग्रेड", "number नंबर नम्बर", "piece pieces पीस", "crate crates क्रेट",
+  "grade gred ग्रेड", "number numbar नंबर नम्बर", "piece pieces पीस", "crate crates क्रेट",
   "ko को", "ke के", "liye लिए लिये", "ka का", "ki की", "wala वाला", "wale वाले",
   "bill बिल", "maal माल", "rate रेट भाव", "rupaye रुपये रुपए rupees", "cash कैश नकद",
   "upi यूपीआई", "payment पेमेंट भुगतान", "full poora pura poori पूरा पूरी", "aadha adha आधा",
@@ -20,7 +24,7 @@ for (const group of [
   "kaat kat काट", "haan han हां हाँ", "pata पता", "phir फिर", "bhi भी",
   "nahi nahin नहीं", "arre are अरे", "ruk रुको रुक", "hata हटा", "badal बदल",
   "cancel कैंसल कैंसिल रद्द", "rehne रहने", "banao बनाओ", "padho पढ़ो पढ़ो",
-  "kuch कुछ", "paise पैसे", "baad बाद", "hazaar hazar hajar हजार हज़ार",
+  "kuch कुछ", "paise पैसे", "baad बाद", "hazaar hazar hajar hajaar हजार हज़ार",
   "lakh lac लाख", "sau सौ", "dedh डेढ़ डेढ़", "dhai ढाई", "saadhe sadhe साढ़े साढ़े",
   "1 ek one एक", "2 two", "3 teen three तीन", "4 char chaar four चार",
   "5 panch paanch five पांच पाँच", "6 che chhe six छह छः", "7 saat seven सात", "8 aath eight आठ",
@@ -125,6 +129,22 @@ function paymentFrom(text: string): Payment | null {
   return { mode: (before?.[2] ?? after![1]) as Payment["mode"], amount: value };
 }
 
+function cleanClause(clause: string): string {
+  return clause
+    .replace(/ (?:baaki|aadha) (?:udhaar(?: likh (?:de|do|dena)| likho)?|khate mein)$/, "")
+    .replace(/(?: (?:de do|de dena|diya hai|diye hain|diya|diye|aaya hai|aaya|aaye|laga de|laga do|laga|kar do|kar))+$/, "");
+}
+
+function splitSpokenClause(clause: string): string[] {
+  // A transcriber can omit punctuation between a complete item and a payment.
+  for (const boundary of clause.matchAll(/ /g)) {
+    const left = clause.slice(0, boundary.index);
+    const right = clause.slice(boundary.index + 1);
+    if (itemFrom(cleanClause(left)) && paymentFrom(cleanClause(right))) return [left, right];
+  }
+  return [clause];
+}
+
 // Resolve relative payments only after all item and rate edits have been applied.
 function applyPayments(entries: BillEntries, payments: Payment[], total: number): boolean {
   if (payments.some(({ amount }) => typeof amount !== "number")) {
@@ -138,7 +158,8 @@ function applyPayments(entries: BillEntries, payments: Payment[], total: number)
   return true;
 }
 
-export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean): VoiceTurn {
+export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean, pending?: FollowUp): VoiceTurn {
+  if (!clearSpeech(text)) return { kind: "repeat", reason: "unclear" };
   let command = normalize(text).replace(/^arre /, "");
   if (/^(?:haan(?: pata hai)?(?: ,? ?(?:phir bhi )?(?:bill )?kaat do)?|(?:bill )?kaat do)$/.test(command)) {
     return { kind: "confirm" };
@@ -147,6 +168,21 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
     return { kind: "cancel" };
   }
   if (/^(?:bill banao|bill padho|dobara padho|फिर से पढ़ो)$/.test(command)) return { kind: "review" };
+
+  if (pending?.kind === "grade") {
+    const label = command.match(new RegExp(`^${GRADE_LABEL}$`));
+    const grade = label?.[1] ?? label?.[2] ?? command.match(/^(?:[123abc]|do)$/)?.[0];
+    if (grade) {
+      const item = { grade: gradeOf(grade), qty: pending.qty, unit: pending.unit };
+      return { kind: "edit", entries: { ...current, items: [...current.items, item] }, followUp: null };
+    }
+  }
+  if (pending?.kind === "payment" && pending.mode) {
+    const amount = paise(command);
+    if (amount !== null) {
+      return { kind: "edit", entries: { ...current, [pending.mode]: amount }, followUp: null };
+    }
+  }
 
   command = command
     .replace(/^(?:ruk|nahi(?: nahi)?) (?:, )?/, "")
@@ -167,24 +203,30 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
 
   const entries: BillEntries = { items: [...current.items], cash: current.cash, upi: current.upi };
   const payments: Payment[] = [];
-  const clauses = command.split(/ , | aur /).filter(Boolean);
+  const clauses = command.split(/ , | aur /).filter(Boolean).flatMap(splitSpokenClause);
+  let followUp: FollowUp | null | undefined;
   let activeLine: number | undefined;
   for (const clause of clauses) {
-    const fragment = clause
-      .replace(/ (?:baaki|aadha) (?:udhaar(?: likh (?:de|do|dena)| likho)?|khate mein)$/, "")
-      .replace(/(?: (?:de do|de dena|diya hai|diye hain|diya|diye|aaya hai|aaya|aaye|laga de|laga do|laga|kar do|kar))+$/, "");
+    const fragment = cleanClause(clause);
     const item = itemFrom(fragment);
     if (item) {
       entries.items.push(item);
+      if (pending?.kind === "grade") followUp = null;
       activeLine = entries.items.length - 1;
       continue;
     }
     const payment = paymentFrom(fragment.replace(/^(full) payment /, "$1 "));
     if (payment) {
       payments.push(payment);
+      if (pending?.kind === "payment" && (!pending.mode || pending.mode === payment.mode)) followUp = null;
       continue;
     }
     if (/^(?:baaki |aadha )?(?:udhaar(?: likh (?:de|do|dena)| likho)?|khate mein)$/.test(fragment) || fragment === "payment baad mein") continue;
+    if (/^(?:kuch paise|payment|cash|upi)(?: (?:cash|upi|mein|se))?$/.test(fragment)) {
+      const mode = fragment.match(/\b(cash|upi)\b/)?.[1] as Payment["mode"] | undefined;
+      followUp = { kind: "payment", mode };
+      continue;
+    }
     if (/^(?:kuch paise|payment|cash|upi)\b|\b(?:cash|upi|paise)$/.test(fragment)) return { kind: "repeat", reason: "payment" };
 
     const rate = fragment.match(/^(?:rate (.+)|iska (.+)|(.+) final)$/);
@@ -201,6 +243,13 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
         index = indices[0];
       }
       const line = entries.items[index];
+      if (qty && entries.items.length === 0) {
+        const value = quantity(qty[1]);
+        if (value) {
+          followUp = { kind: "grade", qty: value, unit: qty[2] as Unit };
+          continue;
+        }
+      }
       if (!line) return { kind: "repeat", reason: "line" };
       if (remove) {
         entries.items.splice(index, 1);
@@ -233,5 +282,5 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
   if (!name && clauses.length === 0) return { kind: "repeat", reason: "unclear" };
   const { total } = calculateBill(entries.items, rates);
   if (!applyPayments(entries, payments, total)) return { kind: "repeat", reason: "payment" };
-  return { kind: "edit", name, entries };
+  return { kind: "edit", name, entries, followUp };
 }

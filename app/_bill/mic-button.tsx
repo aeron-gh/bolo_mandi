@@ -1,25 +1,9 @@
 "use client";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { clearSpeech } from "@/lib/voice-text.ts";
+import { listenInBrowser } from "./browser-recognition.ts";
 import { MicIcon } from "./icons.tsx";
-
-type Result = { isFinal: boolean; 0: { transcript: string } };
-type Recognition = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: { results: ArrayLike<Result> }) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
-  onend: (() => void) | null;
-};
-type RecognitionClass = new () => Recognition;
-
-function recognitionClass(): RecognitionClass | undefined {
-  const w = window as unknown as { SpeechRecognition?: RecognitionClass; webkitSpeechRecognition?: RecognitionClass };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
-}
+import { decodeSpeech, hasSpeech, transcribeOnDevice, warmOnDevice } from "./on-device-speech.ts";
 
 type Props = {
   disabled: boolean;
@@ -28,133 +12,184 @@ type Props = {
   onFinish: (text: string, problem?: string) => void;
 };
 
-type Session = { release: () => void; discard: () => void; dispose: () => void };
+type Session = { release: () => void; discard: () => void; cancel: () => void; dispose: () => void };
+type Phase = "idle" | "connecting" | "listening" | "recognizing" | "loading";
 
-const REPEAT = "Awaaz saaf nahi aayi. Phir se bolo ya Likho kholo.";
+const REPEAT = "Mujhe saaf sunai nahi diya. Ek baar phir bolo.";
+const LABEL: Record<Phase, string> = {
+  idle: "Daba ke bolo",
+  connecting: "Mic jud raha hai",
+  listening: "Sun raha hoon",
+  recognizing: "Awaaz samajh raha hoon",
+  loading: "Hindi voice download ho rahi hai",
+};
 
-function recognitionProblem(error: string): string {
-  if (error === "not-allowed" || error === "service-not-allowed") return "Browser mein mic allow karo, ya Likho kholo.";
-  if (error === "network") return "Awaaz ki service se connection nahi hua. Phir se bolo ya Likho kholo.";
-  return REPEAT;
+function micProblem(error: unknown): string {
+  if (error instanceof DOMException && error.name === "NotAllowedError") {
+    return "Browser mein mic allow karo, ya Likho kholo.";
+  }
+  if (error instanceof DOMException && error.name === "NotFoundError") {
+    return "Microphone nahi mila. Mic jodo ya Likho kholo.";
+  }
+  return "Mic se recording nahi hui. Mic check karo ya Likho kholo.";
 }
 
-// The separate level meter is optional. Recognition can still work if the browser cannot open it.
-async function watchLevel(ring: HTMLSpanElement, active: () => boolean): Promise<(() => void) | undefined> {
-  if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const release = () => stream.getTracks().forEach((track) => track.stop());
-  if (!active()) {
-    release();
-    return;
-  }
-  let audio: AudioContext | undefined;
-  try {
-    audio = new AudioContext();
-    const analyser = audio.createAnalyser();
-    analyser.fftSize = 512;
-    audio.createMediaStreamSource(stream).connect(analyser);
-    const samples = new Uint8Array(analyser.fftSize);
-    let frame = 0;
-    const tick = () => {
-      analyser.getByteTimeDomainData(samples);
-      let sum = 0;
-      for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
-      const level = Math.min(1, Math.sqrt(sum / samples.length) * 5);
-      ring.style.transform = `scale(${1 + level * 0.5})`;
-      frame = requestAnimationFrame(tick);
-    };
-    tick();
-    const meter = audio;
-    return () => {
-      cancelAnimationFrame(frame);
-      ring.style.transform = "";
-      release();
-      void meter.close();
-    };
-  } catch {
-    release();
-    if (audio) void audio.close();
-  }
+function watchLevel(ring: HTMLSpanElement, stream: MediaStream): (() => void) | undefined {
+  if (!window.AudioContext || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const audio = new AudioContext();
+  const analyser = audio.createAnalyser();
+  analyser.fftSize = 512;
+  audio.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Uint8Array(analyser.fftSize);
+  let frame = 0;
+  const tick = () => {
+    analyser.getByteTimeDomainData(samples);
+    let sum = 0;
+    for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
+    const level = Math.min(1, Math.sqrt(sum / samples.length) * 5);
+    ring.style.transform = `scale(${1 + level * 0.5})`;
+    frame = requestAnimationFrame(tick);
+  };
+  tick();
+  return () => {
+    cancelAnimationFrame(frame);
+    ring.style.transform = "";
+    void audio.close();
+  };
 }
 
 export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
   const ring = useRef<HTMLSpanElement>(null);
   const session = useRef<Session | null>(null);
-  const [held, setHeld] = useState(false);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const held = phase === "connecting" || phase === "listening";
+  const processing = phase === "recognizing" || phase === "loading";
 
   useEffect(() => () => session.current?.dispose(), []);
 
   function start() {
     if (disabled || session.current) return;
     if (!window.isSecureContext) return onFinish("", "Mic sirf HTTPS ya localhost par chalta hai.");
-    const Recognizer = recognitionClass();
-    if (!Recognizer) return onFinish("", "Is browser mein mic se bill nahi banta. Chrome ya Likho try karo.");
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      return onFinish("", "Is browser mein recording nahi chalti. Chrome ya Likho try karo.");
+    }
 
-    const rec = new Recognizer();
-    rec.lang = "hi-IN";
-    rec.interimResults = true;
-    rec.continuous = true;
-    let finalized = "";
-    let released = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+    const { signal } = controller;
+    let stream: MediaStream | undefined;
+    let recorder: MediaRecorder | undefined;
+    let recognition: ReturnType<typeof listenInBrowser>;
+    let nativeWords: Promise<string> | undefined;
     let stopLevel: (() => void) | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let released = false;
+    const chunks: Blob[] = [];
+
+    function stopInput() {
+      stopLevel?.();
+      stopLevel = undefined;
+      stream?.getTracks().forEach((track) => track.stop());
+      stream = undefined;
+    }
 
     function dispose() {
       session.current = null;
       clearTimeout(timer);
-      stopLevel?.();
-      stopLevel = undefined;
-      rec.onresult = rec.onerror = rec.onend = null;
+      controller.abort();
+      recognition?.discard();
+      if (recorder) {
+        recorder.ondataavailable = recorder.onerror = recorder.onstop = null;
+        if (recorder.state !== "inactive") recorder.stop();
+      }
+      stopInput();
     }
 
-    function discard(problem?: string) {
+    function finish(text: string, problem?: string) {
       dispose();
-      rec.abort();
-      setHeld(false);
-      onFinish("", problem);
+      setPhase("idle");
+      onFinish(text, problem);
     }
 
     function release() {
       if (released) return;
       released = true;
-      setHeld(false);
+      if (!recorder) return finish("", "Mic taiyaar hone par phir se daba ke bolo.");
+      setPhase("recognizing");
       stopLevel?.();
       stopLevel = undefined;
-      // Some services never emit end after a failed stop. Drop that turn.
-      timer = setTimeout(() => discard(REPEAT), 5000);
-      rec.stop();
+      clearTimeout(timer);
+      timer = setTimeout(() => finish("", REPEAT), 3000);
+      nativeWords = recognition?.finish();
+      if (recorder.state !== "inactive") recorder.stop();
     }
 
-    const recording: Session = { release, discard: () => { if (!released) discard(); }, dispose: () => { dispose(); rec.abort(); } };
-    rec.onresult = ({ results }) => {
-      const all = Array.from(results);
-      finalized = all.filter((result) => result.isFinal).map((result) => result[0].transcript.trim()).join(" ").trim();
-      onWords(all.map((result) => result[0].transcript.trim()).join(" ").trim());
-    };
-    rec.onerror = ({ error }) => discard(recognitionProblem(error));
-    rec.onend = () => {
-      dispose();
-      setHeld(false);
-      if (released && finalized) onFinish(finalized);
-      else onFinish("", REPEAT);
-    };
+    async function readRecording() {
+      if (!released) return finish("", "Mic se recording ruk gayi. Phir se bolo ya Likho kholo.");
+      const words = await nativeWords;
+      if (signal.aborted) return;
+      clearTimeout(timer);
+      stopInput();
+      if (words && clearSpeech(words)) return finish(words);
 
-    session.current = recording;
-    setHeld(true);
+      onWords("");
+      const recording = new Blob(chunks, { type: recorder?.mimeType });
+      let samples: Float32Array;
+      try {
+        if (!recording.size) return finish("", REPEAT);
+        samples = await decodeSpeech(recording);
+      } catch {
+        if (!signal.aborted) finish("", REPEAT);
+        return;
+      }
+      if (signal.aborted) return;
+      if (!hasSpeech(samples)) return finish("", REPEAT);
+      try {
+        const text = await transcribeOnDevice(samples, signal, setPhase);
+        if (!signal.aborted) {
+          if (clearSpeech(text)) finish(text);
+          else finish("", REPEAT);
+        }
+      } catch (error) {
+        if (!signal.aborted) finish("", error instanceof Error ? error.message : REPEAT);
+      }
+    }
+
+    session.current = {
+      release,
+      discard: () => { if (!released) finish(""); },
+      cancel: () => finish(""),
+      dispose,
+    };
     onStart();
-    try {
-      rec.start();
-    } catch {
-      discard(REPEAT);
-      return;
-    }
-    if (ring.current) {
-      const active = () => session.current === recording && !released;
-      void watchLevel(ring.current, active).then((cleanup) => {
-        if (active()) stopLevel = cleanup;
-        else cleanup?.();
-      }).catch(() => {});
-    }
+    setPhase("connecting");
+    void navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true } })
+      .then((input) => {
+        if (signal.aborted) {
+          input.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = input;
+        recorder = new MediaRecorder(input);
+        recorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); };
+        recorder.onstop = () => void readRecording();
+        recorder.onerror = () => finish("", "Mic se recording nahi hui. Phir se bolo ya Likho kholo.");
+        recorder.start();
+        const track = input.getAudioTracks()[0];
+        if (track) recognition = listenInBrowser(track, (text) => onWords(clearSpeech(text) ? text : ""), warmOnDevice);
+        if (!recognition) warmOnDevice();
+        if (ring.current) {
+          try {
+            stopLevel = watchLevel(ring.current, input);
+          } catch {
+            // The level ring is optional.
+          }
+        }
+        timer = setTimeout(() => finish("", "Ek baar mein 20 second tak bolo."), 20000);
+        setPhase("listening");
+      })
+      .catch((error) => {
+        if (!signal.aborted) finish("", micProblem(error));
+      });
   }
 
   function onKey(event: KeyboardEvent, down: boolean) {
@@ -170,7 +205,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
         type="button"
         aria-label="Daba ke bolo"
         aria-pressed={held}
-        disabled={disabled}
+        disabled={disabled || processing}
         onPointerDown={(event) => {
           if (event.button !== 0 || !event.isPrimary) return;
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -192,7 +227,12 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
         />
         <MicIcon className="size-9" />
       </button>
-      <span className="text-sm text-muted">{held ? "Sun raha hoon" : "Daba ke bolo"}</span>
+      <span role="status" className="text-center text-sm text-muted">{LABEL[phase]}</span>
+      {processing && (
+        <button type="button" onClick={() => session.current?.cancel()} className="min-h-11 px-3 font-medium text-coconut focus-visible:outline-2">
+          Roko
+        </button>
+      )}
     </div>
   );
 }

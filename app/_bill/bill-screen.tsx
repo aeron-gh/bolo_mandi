@@ -9,6 +9,7 @@ import type { Customer, CustomerMatch } from "@/lib/customers.ts";
 import { billReducer, newDraft, newDraftId, whatIsMissing, type Action, type BillDraft } from "@/lib/draft.ts";
 import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
+import type { FollowUp } from "@/lib/voice.ts";
 import { confirmBill, fetchPreview, friendlyError, interpretBill, type BillBody } from "./api-client.ts";
 import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
@@ -32,7 +33,22 @@ type Fresh = { preview: BillPreview | null; fresh: boolean };
 type CustomerSuggestion = { name: string; match: CustomerMatch };
 
 function speakPreview(preview: BillPreview) {
-  speakHindi(hindiReadBack({ ...preview, customerName: preview.customer.name }));
+  const lines = preview.lines.map((line) => `ग्रेड ${line.grade} के ${line.qty} ${line.unit === "crate" ? "क्रेट" : "पीस"}।`);
+  speakHindi([...lines, hindiReadBack({ ...preview, customerName: preview.customer.name })].join(" "));
+}
+
+function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof whatIsMissing>) {
+  if (followUp?.kind === "grade") {
+    return [`${followUp.qty} ${followUp.unit}. Kaunsa grade?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"}। कौन सा ग्रेड?`];
+  }
+  if (followUp?.kind === "payment") {
+    if (followUp.mode === "cash") return ["Kitna cash mila?", "कितना कैश मिला?"];
+    if (followUp.mode === "upi") return ["Kitna UPI aaya?", "कितनी रकम यूपीआई से आई?"];
+    return ["Kitne rupaye mile, cash ya UPI?", "कितने रुपये मिले, कैश या यूपीआई?"];
+  }
+  if (missing === "customer") return ["Kiske naam ka bill banao?", "किसके नाम का बिल बनाऊँ?"];
+  if (missing === "items") return ["Kitne piece ya crate, aur kaunsa grade?", "कितने पीस या क्रेट, और कौन सा ग्रेड?"];
+  return null;
 }
 
 // The one big button changes with the bill's state. Nothing saves without "haan".
@@ -66,10 +82,19 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const [voice, setVoice] = useState<"idle" | "recording" | "interpreting">("idle");
   const voiceRequest = useRef<AbortController | null>(null);
   const reviewRequested = useRef(false);
+  const [followUp, setFollowUp] = useState<FollowUp | null>(null);
+  const [voiceQuestion, setVoiceQuestion] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<CustomerSuggestion | null>(null);
   const [pickNote, setPickNote] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [likhoOpen, setLikhoOpen] = useState(false);
+  const likhoPanel = useRef<HTMLElement>(null);
+
+  function openLikho() {
+    const input = likhoPanel.current?.querySelector("input:not(:disabled)");
+    if (input instanceof HTMLInputElement && input.getClientRects().length) input.focus();
+    else setLikhoOpen(true);
+  }
 
   const body: BillBody | null = draft.customer
     ? { customerId: draft.customer.id, items: draft.items, cash: draft.cash, upi: draft.upi }
@@ -93,7 +118,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
         .catch((e) => {
           if (!controller.signal.aborted) setPreviewError({ key, message: friendlyError(e) });
         });
-    }, 120);
+    }, reviewRequested.current ? 0 : 120);
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -107,16 +132,20 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
 
   useEffect(() => {
     if (!reviewRequested.current || voice !== "idle" || customerOpen || likhoOpen || saving ||
-        draft.state !== "DRAFT" || whatIsMissing(draft) || !fresh || !preview) return;
+        draft.state !== "DRAFT" || followUp || whatIsMissing(draft) || !fresh || !preview) return;
     reviewRequested.current = false;
     speakPreview(preview.data);
     if (!preview.data.overpaidBy) dispatch({ type: "readBack", draftId: newDraftId() });
-  }, [customerOpen, draft, fresh, likhoOpen, preview, saving, voice]);
+  }, [customerOpen, draft, followUp, fresh, likhoOpen, preview, saving, voice]);
 
   function edit(action: Action) {
     reviewRequested.current = false;
     stopSpeaking();
     setError(null);
+    const paymentEntered = action.type === "setPayment" && followUp?.kind === "payment"
+      && (!followUp.mode || action[followUp.mode] !== undefined);
+    if (action.type === "cancel" || (action.type === "addItem" && followUp?.kind === "grade") || paymentEntered) setFollowUp(null);
+    setVoiceQuestion(null);
     dispatch(action);
   }
 
@@ -124,7 +153,8 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
     if (suggestion) {
       setSuggestion(null);
       setError(null);
-      reviewRequested.current = true;
+      askNext(whatIsMissing({ ...draft, customer }), followUp);
+      reviewRequested.current = !followUp;
       dispatch({ type: "setCustomer", customer });
     } else {
       edit({ type: "setCustomer", customer });
@@ -133,14 +163,14 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   }
 
   function review() {
-    if (!fresh || !preview || whatIsMissing(draft)) return;
+    if (!fresh || !preview || followUp || whatIsMissing(draft)) return;
     setError(null);
     speakPreview(preview.data);
     if (!preview.data.overpaidBy) dispatch({ type: "readBack", draftId: newDraftId() });
   }
 
   async function confirm() {
-    if (draft.state !== "AWAITING_CONFIRM" || !body || !fresh || !preview || !draft.draftId || saveInFlight.current) return;
+    if (draft.state !== "AWAITING_CONFIRM" || !body || !fresh || !preview || !draft.draftId || followUp || saveInFlight.current) return;
     saveInFlight.current = true;
     stopSpeaking();
     setError(null);
@@ -175,34 +205,45 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
     setError(null);
   }
 
+  function askNext(missing: ReturnType<typeof whatIsMissing>, pending: FollowUp | null) {
+    const prompt = nextVoiceQuestion(pending, missing);
+    setVoiceQuestion(prompt?.[0] ?? null);
+    if (prompt) speakHindi(prompt[1]);
+  }
+
   async function finishVoice(text: string, problem?: string) {
     setWords(text);
     if (!text) {
       setVoice("idle");
-      if (problem) setError(problem);
+      if (problem) {
+        setError(problem);
+        if (problem.startsWith("Mujhe saaf sunai")) speakHindi("मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलें।");
+      }
       return;
     }
     setVoice("interpreting");
     const controller = new AbortController();
     voiceRequest.current = controller;
     try {
-      const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, !draft.customer, controller.signal);
+      const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, !draft.customer, followUp, controller.signal);
       if (controller.signal.aborted) return;
       if (turn.kind === "confirm") {
         if (draft.state === "AWAITING_CONFIRM" && fresh) void confirm();
+        else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else setError("Pehle bill ka hisaab suno, phir haan bolo.");
       } else if (turn.kind === "review") {
-        review();
+        if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
+        else review();
       } else if (turn.kind === "cancel") {
         setSuggestion(null);
         edit({ type: "cancel" });
         speakHindi("बिल रद्द हो गया।");
       } else if (turn.kind === "repeat") {
         dispatch({ type: "reviewAgain" });
-        const prompt = {
+        const prompt = nextVoiceQuestion(followUp, null) ?? {
           payment: ["Kitne rupaye cash ya UPI mile?", "कितने रुपये कैश या यूपीआई मिले?"],
           line: ["Kaunsi line badalni hai? Grade bolo ya Likho mein badlo.", "कौन सी लाइन बदलनी है? ग्रेड बोलें या लिखकर बदलें।"],
-          unclear: ["Baat samajh nahi aayi. Jaise bolo, Manat ko 10 piece grade 1.", "बात समझ नहीं आई। फिर से बोलें।"],
+          unclear: ["Bill ke liye naam, kitne piece aur grade bolo. Jaise Manat ko 10 piece grade 1.", "बिल के लिए नाम, कितने पीस और ग्रेड बताएं। जैसे मनत को दस पीस ग्रेड एक।"],
         }[turn.reason];
         setError(prompt[0]);
         speakHindi(prompt[1]);
@@ -210,13 +251,17 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
         const match = turn.match;
         const name = turn.name;
         const customer = match ? (match.kind === "found" ? match.customer : null) : draft.customer;
+        const pending = turn.followUp === undefined ? followUp : turn.followUp;
+        setFollowUp(pending);
         if (match && name) {
           setSuggestion(match.kind === "found" ? null : { name, match });
           setPickNote(match.kind === "found" && match.fuzzy ? `"${name}" se milta-julta naam chuna. Galat ho to Badlo.` : null);
           if (match.kind === "ambiguous") speakHindi("कौन सा ग्राहक? पूरा नाम बोलें या सूची से चुनें।");
           if (match.kind === "not_found") speakHindi("नाम सूची में नहीं मिला। ग्राहक चुनें।");
         }
-        reviewRequested.current = true;
+        if (match?.kind === "ambiguous" || match?.kind === "not_found") setVoiceQuestion(null);
+        else askNext(whatIsMissing({ ...draft, ...turn.entries, customer }), pending);
+        reviewRequested.current = !pending;
         dispatch({ type: "voiceEdit", customer, ...turn.entries });
       }
     } catch (e) {
@@ -240,6 +285,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const customerQuestion = suggestion?.match.kind === "ambiguous"
     ? `Kaun sa ${suggestion.name}? Poora naam bolo ya customer chuno.`
     : suggestion && `"${suggestion.name}" ka naam nahi mila. Phir se bolo ya customer chuno.`;
+  const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
   const panel = <EntryPanel items={draft.items} cash={draft.cash} upi={draft.upi} rates={rates} locked={locked || busy} dispatch={edit} />;
 
   return (
@@ -258,21 +304,21 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
         </div>
         <Dock
           words={words}
-          question={question ?? customerQuestion}
+          question={error ? null : question ?? nextQuestion ?? null}
           problem={error ?? (previewError?.key === key ? previewError.message : null)}
-          action={{ ...action, run }}
-          hint={customerQuestion ? null : hint}
+          action={{ ...action, disabled: action.disabled || Boolean(followUp), run }}
+          hint={nextQuestion || error ? null : hint}
           busy={busy}
           micDisabled={locked || saving || voice === "interpreting" || customerOpen || likhoOpen}
           onReplay={question ? review : null}
           onStart={startVoice}
           onWords={setWords}
           onFinish={(text, problem) => void finishVoice(text, problem)}
-          onLikho={() => setLikhoOpen(true)}
+          onLikho={openLikho}
         />
       </div>
 
-      <aside className="hidden border-l border-line bg-paper lg:block" aria-label="Likho">
+      <aside ref={likhoPanel} className="hidden border-l border-line bg-paper lg:block" aria-label="Likho">
         <div className="sticky top-0 p-6">{panel}</div>
       </aside>
 

@@ -34,9 +34,12 @@ npm run dev      # http://localhost:3000
 ## Use the mic
 
 Open Bolo in Chrome on localhost or HTTPS and allow microphone access. Hold
-**Daba ke bolo** while speaking, then release it. Try “Manat ko 10 piece grade 1
+**Daba ke bolo**, wait for **Sun raha hoon**, speak, then release it. Try “Manat ko 10 piece grade 1
 aur 5 grade 2, 4 hazaar cash.” If several customers match, say the full name or
 choose one from the customer list.
+
+You can also speak in steps. Say “Vikas ko das piece,” then answer “do number”
+when Bolo asks for the grade. If it asks how much cash arrived, say the amount.
 
 Bolo reads back the total, payment split, new udhaar and any credit warning in
 Hindi using the browser's speech voice. Check the receipt, then say “haan, kaat
@@ -44,8 +47,12 @@ do” or tap the confirmation button. For a correction, try “grade 2 nahi, gra
 1 kar” or edit in **Likho**. Use **Phir suno** to replay the read-back.
 
 Supported voice commands cover billing, payment splits, corrections and
-cancellation. The browser or OS supplies speech recognition and synthesis, so
-availability and voices depend on the device. **Likho** works without the mic.
+cancellation. If browser recognition fails, Bolo transcribes the recording on
+your device. The first fallback needs an internet connection to download the
+Hinglish model and runtime (about 120 MB). The browser caches those files
+for later use. Bolo starts loading the fallback while you speak when it
+already knows the browser service is unavailable. The browser or OS supplies
+the read-back voice. **Likho** works without the mic.
 
 ## Rules the code follows
 

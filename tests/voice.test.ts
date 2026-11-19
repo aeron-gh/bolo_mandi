@@ -73,9 +73,40 @@ describe("voice billing", () => {
   });
 
   it("asks for clarification instead of partially applying an unclear turn", () => {
-    expect(say("Vikas ko 5 grade 3, kuch paise diye hain.")).toEqual({ kind: "repeat", reason: "payment" });
+    expect(say("Vikas ko 5 grade 3, kuch paise diye hain.")).toMatchObject({
+      kind: "edit", entries: { items: [{ grade: 3, qty: 5 }] }, followUp: { kind: "payment" },
+    });
     expect(say("Rahul ko 10 grade 1, haan kaat do.")).toEqual({ kind: "repeat", reason: "unclear" });
     expect(say("Deepak ko 10 grade 2, rehne do, cancel kar.")).toEqual({ kind: "cancel" });
     expect(say("bill cancel karo")).toEqual({ kind: "cancel" });
+  });
+
+  it("keeps the piece count and accepts a grade in the next turn", () => {
+    const first = say("Vikaas ko das piece.");
+    expect(first).toMatchObject({ kind: "edit", followUp: { kind: "grade", qty: 10, unit: "piece" } });
+    if (first.kind !== "edit") throw new Error("expected a follow-up");
+    expect(voiceBill(db, rates, { ...first.entries, words: "Do number", followUp: first.followUp })).toMatchObject({
+      kind: "edit", entries: { items: [{ grade: 2, qty: 10 }] }, followUp: null,
+    });
+  });
+
+  it("keeps the bill when asking for a cash amount", () => {
+    const first = say("Vikas ko 10 grade 2, cash diya.");
+    expect(first).toMatchObject({ kind: "edit", followUp: { kind: "payment", mode: "cash" } });
+    if (first.kind !== "edit") throw new Error("expected a follow-up");
+    expect(voiceBill(db, rates, { ...first.entries, words: "das hazaar", followUp: first.followUp })).toMatchObject({
+      kind: "edit", entries: { items: [{ grade: 2, qty: 10 }], cash: rs(10000) }, followUp: null,
+    });
+  });
+
+  it("handles a transcript with no pause between an item and its payment", () => {
+    expect(say("Vikaas ko das grade do das hazaar cash")).toMatchObject({
+      kind: "edit", entries: { items: [{ grade: 2, qty: 10 }], cash: rs(10000) },
+    });
+  });
+
+  it("drops repeated recognition artifacts before customer search", () => {
+    expect(say("प्रॉ प्रॉ प्रॉ प्रॉ प्रॉ प्रॉ")).toEqual({ kind: "repeat", reason: "unclear" });
+    expect(say("apruvuvuvuvuvuvuvuvuvuvuvuvuvuvuvuvuvu")).toEqual({ kind: "repeat", reason: "unclear" });
   });
 });

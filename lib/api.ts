@@ -10,7 +10,7 @@ import { getKhata, type Khata } from "./ledger.ts";
 import { formatRupees } from "./money.ts";
 import { readBackText } from "./readback.ts";
 import { spokenName } from "./spoken-name.ts";
-import { interpretVoice, type BillEntries, type VoiceTurn } from "./voice.ts";
+import { interpretVoice, type BillEntries, type FollowUp, type VoiceTurn } from "./voice.ts";
 
 type BillRequest = { customerId: number; items: ItemInput[]; cash: number; upi: number };
 
@@ -97,7 +97,17 @@ export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): Voi
   const raw = asBody(body);
   if (typeof raw.words !== "string" || raw.words.length > 2000) throw new Error("unclear voice input");
   const { items, cash, upi }: BillEntries = parseBill({ ...raw, customerId: 0 });
-  const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true);
+  let followUp: FollowUp | undefined;
+  if (raw.followUp != null) {
+    const asked = asBody(raw.followUp);
+    if (asked.kind === "grade" && typeof asked.qty === "number" && Number.isSafeInteger(asked.qty)
+      && asked.qty > 0 && (asked.unit === "piece" || asked.unit === "crate")) {
+      followUp = { kind: "grade", qty: asked.qty, unit: asked.unit };
+    } else if (asked.kind === "payment" && (asked.mode === "cash" || asked.mode === "upi" || asked.mode === undefined)) {
+      followUp = { kind: "payment", mode: asked.mode };
+    }
+  }
+  const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true, followUp);
   if (turn.kind !== "edit" || !turn.name) return turn;
   const name = spokenName(turn.name);
   return { ...turn, name, match: searchCustomers(db, name) };

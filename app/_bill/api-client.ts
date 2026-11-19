@@ -2,6 +2,7 @@
 import type { BillPreview, VoiceBillResult } from "@/lib/api.ts";
 import type { ItemInput, SaveResult } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
+import type { FollowUp } from "@/lib/voice.ts";
 
 export type BillBody = { customerId: number; items: ItemInput[]; cash: number; upi: number };
 
@@ -22,8 +23,8 @@ export const fetchPreview = (body: BillBody, signal: AbortSignal) =>
   call<BillPreview>("/api/bills/preview", post(body, signal));
 export const confirmBill = (body: BillBody & { draftId: string; allowOverLimit: boolean }) =>
   call<SaveResult>("/api/bills", post(body));
-export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, needsCustomer: boolean, signal: AbortSignal) =>
-  call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, needsCustomer }, signal));
+export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, needsCustomer: boolean, followUp: FollowUp | null, signal: AbortSignal) =>
+  call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, needsCustomer, followUp }, signal));
 
 // Server messages are for developers; the trader gets a plain Hinglish line.
 const FRIENDLY: [RegExp, string][] = [

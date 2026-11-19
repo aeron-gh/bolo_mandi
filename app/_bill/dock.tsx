@@ -29,10 +29,10 @@ export function Dock({ words, question, problem, action, hint, busy, micDisabled
   return (
     <div className="sticky bottom-0 z-30 border-t border-line bg-canvas px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
       <div className="mx-auto max-w-lg space-y-3">
-        {words && <p className="text-muted">&ldquo;{words}&rdquo;</p>}
+        {words && <p className="wrap-anywhere text-muted">&ldquo;{words}&rdquo;</p>}
         {question && (
           <div className="flex items-start gap-2">
-            <p className="flex-1 text-lg font-medium leading-snug">{question}</p>
+            <p className="min-w-0 flex-1 wrap-anywhere text-lg font-medium leading-snug">{question}</p>
             {onReplay && (
               <button onClick={onReplay} disabled={busy} className="min-h-11 rounded-lg px-2 font-semibold text-coconut outline-coconut focus-visible:outline-2 disabled:opacity-40">
                 Phir suno
@@ -53,7 +53,7 @@ export function Dock({ words, question, problem, action, hint, busy, micDisabled
           <button
             onClick={onLikho}
             disabled={busy}
-            className="flex h-14 items-center gap-2 justify-self-start rounded-xl px-3 font-medium outline-coconut hover:bg-paper focus-visible:outline-2 disabled:opacity-40 lg:invisible"
+            className="flex h-14 items-center gap-2 justify-self-start rounded-xl px-3 font-medium outline-coconut hover:bg-paper focus-visible:outline-2 disabled:opacity-40"
           >
             <KeyboardIcon className="size-6" />
             Likho
