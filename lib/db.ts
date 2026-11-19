@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import seedJson from "../data/seed.json" with { type: "json" };
 import { rs } from "./money.ts";
+import { migrate } from "./migrations.ts";
 import type { Grade, RateCard } from "./billing.ts";
 
 export type Seed = {
@@ -10,8 +11,9 @@ export type Seed = {
   products: { name: string; grade: number; rate: number }[];
 };
 
+// Version 0 of the tables: what the app made before migrations existed. lib/migrations.ts builds on it.
 // STRICT tables refuse wrong types, so a float can never sit in a paise column.
-const SCHEMA = `
+export const BASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS customers (
   id                 INTEGER PRIMARY KEY,
   name               TEXT    NOT NULL UNIQUE,
@@ -70,12 +72,13 @@ CREATE TABLE IF NOT EXISTS promises (
 // The real database file. Tests use ":memory:" instead.
 export const DB_FILE = path.join(process.cwd(), "data", "bolo.db");
 
-// Open (or create) the database and make sure the tables exist.
+// Open (or create) the database and bring its tables up to the latest version, keeping all data.
 export function openDb(file: string): DatabaseSync {
   const db = new DatabaseSync(file);
   db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;");
   if (file !== ":memory:") db.exec("PRAGMA journal_mode = WAL;");
-  db.exec(SCHEMA);
+  db.exec(BASE_SCHEMA);
+  migrate(db);
   return db;
 }
 
