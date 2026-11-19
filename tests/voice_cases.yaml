@@ -1,0 +1,235 @@
+# ---------- B: Basic billing (10) ----------
+- id: B01
+  say: "Manat ko 10 piece grade 1, 5 piece grade 2 aur 10 piece grade 3 de dena. 4,000 cash diya hai, baaki udhaar likh de."
+  expect: {customer: Manat, total: 25000, cash: 4000, upi: 0, udhaar: 21000, new_outstanding: 33500, credit_left: 66500}
+
+- id: B02
+  say: "Sameer ko 20 piece grade 2 de do."
+  expect: {customer: Sameer, total: 24000, udhaar: 24000, new_outstanding: 24000, credit_left: 126000, says_full_udhaar: true}
+
+- id: B03
+  say: "Rahul ko 50 grade 3."
+  expect: {customer: Rahul, total: 20000, udhaar: 20000, new_outstanding: 105000}
+
+- id: B04
+  say: "Deepak ko ek number wala 100 piece."
+  expect: {customer: Deepak, items: [{grade: 1, qty: 100}], total: 150000, new_outstanding: 500000}
+
+- id: B05
+  say: "Anil ko 8 piece do number ka, poora cash."
+  expect: {customer: Anil, total: 9600, cash: 9600, udhaar: 0, new_outstanding: 22000}
+
+- id: B06
+  say: "Imran ko 30 grade 1 aur 30 grade 3, UPI se 20 hazaar aaya, baaki khate mein."
+  expect: {customer: Imran, total: 57000, upi: 20000, udhaar: 37000, new_outstanding: 157000}
+
+- id: B07
+  say: "Sameer ke liye 15 pieces grade one, full payment UPI."
+  expect: {customer: Sameer, total: 22500, upi: 22500, udhaar: 0, new_outstanding: 0}
+
+- id: B08
+  say: "Rahul ko 10 grade 1, rate 1400 laga de."
+  expect: {customer: Rahul, items: [{grade: 1, qty: 10, rate: 1400, rate_override: true}], total: 14000, new_outstanding: 99000}
+
+- id: B09
+  say: "Manat ko pachees piece teen number wala."
+  expect: {customer: Manat, items: [{grade: 3, qty: 25}], total: 10000, new_outstanding: 22500}
+
+- id: B10
+  say: "Imran ko dedh sau piece grade 3."
+  expect: {customer: Imran, items: [{grade: 3, qty: 150}], total: 60000, new_outstanding: 180000}
+
+# ---------- P: Payment split (6) ----------
+- id: P01
+  say: "Deepak ka bill: 40 grade 2. 10 hazaar cash, 20 hazaar UPI, baaki udhaar."
+  expect: {total: 48000, cash: 10000, upi: 20000, udhaar: 18000, new_outstanding: 368000}
+
+- id: P02
+  say: "Anil ko 5 grade 1, 2 hazaar cash aur 3 hazaar UPI."
+  expect: {total: 7500, cash: 2000, upi: 3000, udhaar: 2500, new_outstanding: 24500}
+
+- id: P03
+  say: "Sameer ko 2 grade 2, 5000 cash diya."
+  expect: {total: 2400, must_ask: "extra 2600: return or advance?", saved: false}
+
+- id: P04
+  say: "Manat ko 4 grade 3, aadha cash aadha udhaar."
+  expect: {total: 1600, cash: 800, udhaar: 800, new_outstanding: 13300}
+
+- id: P05
+  say: "Rahul ko 10 grade 2, payment baad mein."
+  expect: {total: 12000, udhaar: 12000, new_outstanding: 97000}
+
+- id: P06
+  say: "Vikas ko 5 grade 3, kuch paise diye hain."
+  expect: {total: 2000, must_ask: "how much was paid?", saved: false}
+
+# ---------- N: Names and ambiguity (6) ----------
+- id: N01
+  say: "Afzal ko 10 grade 1 de do."
+  expect: {must_ask: "which Afzal?", options: [Afzal Khan, Afzal Ahmed, Afzal Traders], saved: false}
+
+- id: N02
+  turns:
+    - "Afzal ko 10 grade 1 de do."
+    - "Afzal Ahmed."
+  expect: {customer: Afzal Ahmed, total: 15000, new_outstanding: 35000, credit_left: 115000}
+
+- id: N03
+  say: "Afzal Khan ko 20 grade 3."
+  expect: {customer: Afzal Khan, must_ask: false, total: 8000, new_outstanding: 53000}
+
+- id: N04
+  say: "Afjal Traders ko 5 grade 2."
+  expect: {customer: Afzal Traders, fuzzy_match: true, total: 6000, new_outstanding: 81000}
+
+- id: N05
+  say: "Ramesh ko 10 grade 1."
+  expect: {must_ask: "new customer? add?", saved: false}
+
+- id: N06
+  say: "Afzal bhai ka udhaar print kar."
+  expect: {must_ask: "which Afzal?", printed: false}
+
+# ---------- C: Credit limit (5) ----------
+- id: C01
+  say: "Vikas ko 100 grade 3 de do."
+  expect: {total: 40000, new_outstanding: 48000, credit_left: 2000, warning: near_limit}
+
+- id: C02
+  say: "Vikas ko 40 grade 2."
+  expect: {total: 48000, new_outstanding: 56000, warning: over_limit, over_by: 6000, must_ask: true, saved: false}
+
+- id: C03
+  say: "Anil ko 40 grade 1."
+  expect: {total: 60000, new_outstanding: 82000, warning: over_limit, over_by: 7000, must_ask: true}
+
+- id: C04
+  say: "Anil ko 40 grade 1, 10 hazaar cash."
+  expect: {total: 60000, cash: 10000, udhaar: 50000, new_outstanding: 72000, credit_left: 3000, warning: near_limit}
+
+- id: C05
+  turns:
+    - "Vikas ko 40 grade 2."
+    - "Haan pata hai, kaat do."
+  expect: {saved: true, over_limit: true, new_outstanding: 56000}
+
+# ---------- R: Corrections and interruptions (6) ----------
+- id: R01
+  say: "Manat ko 10 grade 1... nahi nahi, 12 piece."
+  expect: {items: [{grade: 1, qty: 12}], total: 18000, new_outstanding: 30500}
+
+- id: R02
+  turns:
+    - "Sameer ko 10 grade 2."
+    - "Grade 2 nahi, grade 1 kar."
+  expect: {items: [{grade: 1, qty: 10}], total: 15000, new_outstanding: 15000}
+
+- id: R03
+  say: "Rahul ko 20 grade 3 aur 5 grade 1, grade 3 wala hata de."
+  expect: {items: [{grade: 1, qty: 5}], total: 7500, new_outstanding: 92500}
+
+- id: R04
+  say: "Deepak ko 10 grade 2... rehne do, cancel kar."
+  expect: {state: CANCELLED, saved: false, new_outstanding: 350000}
+
+- id: R05
+  say: "Imran ko 10 grade 1, arre Imran nahi, Anil ko."
+  expect: {customer: Anil, total: 15000, new_outstanding: 37000, credit_left: 38000}
+
+- id: R06
+  turns:
+    - "Manat ko 5 grade 2."
+    - "[interrupts during read back] Ruk, 8 piece."
+  expect: {items: [{grade: 2, qty: 8}], total: 9600, new_outstanding: 22100, state: AWAITING_CONFIRM, read_back_again: true}
+
+# ---------- X: Noise and bargaining (5) ----------
+- id: X01
+  turns:
+    - "Sameer ko 10 piece grade 3."
+    - "Trader: Iska 700 kar. Customer: Nahi sir, 600 kar do. Trader: 650 final."
+  expect: {items: [{grade: 3, qty: 10, rate: 650, rate_override: true}], total: 6500, new_outstanding: 6500}
+
+- id: X02
+  say: "Manat ko 10 grade 2 [background: bhaiya aloo kitne ka hai] de do."
+  expect: {customer: Manat, total: 12000, new_outstanding: 24500, ignores_background: true}
+
+- id: X03
+  turns:
+    - "Anil ko 5 grade 1."
+    - "Customer: maine 5000 UPI kar diya. Trader: haan 5000 UPI aaya."
+  expect: {total: 7500, upi: 5000, udhaar: 2500, new_outstanding: 24500}
+
+- id: X04
+  turns:
+    - "Anil ko 5 grade 1."
+    - "Customer: maine 5000 de diye."
+  expect: {upi: 0, cash: 0, must_ask: "did trader receive 5000?"}
+
+- id: X05
+  say: "Rahul ko ... grade ... [unclear audio]"
+  expect: {must_ask: "please repeat", saved: false}
+
+# ---------- V: Payments, vasooli, promises (5) ----------
+- id: V01
+  say: "Rahul ne 25 hazaar diye cash mein."
+  expect: {payment: {customer: Rahul, amount: 25000, mode: cash}, new_outstanding: 60000}
+
+- id: V02
+  say: "Imran ka 50000 UPI aaya."
+  expect: {payment: {customer: Imran, amount: 50000, mode: upi}, new_outstanding: 70000}
+
+- id: V03
+  say: "Afzal Khan kal 25 hazaar dega."
+  expect: {promise: {customer: Afzal Khan, amount: 25000, date: today+1}, new_outstanding: 45000}
+
+- id: V04
+  say: "Deepak se 3 lakh 50 hazaar vasooli ho gayi."
+  expect: {payment: {customer: Deepak, amount: 350000}, new_outstanding: 0}
+
+- id: V05
+  say: "Manat ne 20 hazaar diye."
+  expect: {must_ask: "7500 more than outstanding: advance or mistake?", saved: false}
+
+# ---------- L: Ledger, print, WhatsApp (4) ----------
+- id: L01
+  say: "Is customer ka naam Manat hai. Iska udhaar print kar."
+  expect: {printed: true, customer: Manat, outstanding_on_print: 12500}
+
+- id: L02
+  say: "Afzal Traders ka ledger WhatsApp kar do."
+  expect: {must_ask: "phone number?", sent: false}
+
+- id: L03
+  say: "Sameer ka hisaab bata."
+  expect: {speaks: {outstanding: 0, credit_limit: 150000}}
+
+- id: L04
+  turns:
+    - "Afzal ko 120 crate bhej. 80 A grade, 40 B grade. A ka rate 1200 hai aur B ka 900. Afzal kal 25 hazaar dega. Uska ledger WhatsApp kar dena."
+    - "Afzal Khan."
+    - "Haan kaat do."
+  expect:
+    first_turn_must_ask: "which Afzal?"
+    customer: Afzal Khan
+    items: [{grade: 1, qty: 80, rate: 1200, unit: crate}, {grade: 2, qty: 40, rate: 900, unit: crate}]
+    total: 132000
+    udhaar: 132000
+    new_outstanding: 177000
+    credit_left: 23000
+    promise: {amount: 25000, date: today+1}
+    whatsapp: "after save, ask phone number if missing"
+
+# ---------- Q: Questions and reports (3) ----------
+- id: Q01
+  after: [B01, B02]
+  say: "Aaj kitni sale hui?"
+  expect: {speaks: {total_sale: 49000, cash: 4000, upi: 0, udhaar: 45000, bills: 2}}
+
+- id: Q02
+  say: "Kaun kaun limit ke paas hai?"
+  expect: {speaks: {near_limit: [], highest_used: {customer: Deepak, percent: 35}}}
+
+- id: Q03
+  say: "Sabse zyada udhaar kiska hai?"
+  expect: {speaks: {customer: Deepak, outstanding: 350000}}

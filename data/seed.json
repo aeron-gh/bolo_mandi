@@ -1,0 +1,20 @@
+{
+  "customers": [
+    {"name": "Manat", "credit_limit": 100000, "outstanding": 12500},
+    {"name": "Afzal Khan", "credit_limit": 200000, "outstanding": 45000},
+    {"name": "Afzal Ahmed", "credit_limit": 150000, "outstanding": 20000},
+    {"name": "Afzal Traders", "credit_limit": 300000, "outstanding": 75000},
+    {"name": "Rahul", "credit_limit": 300000, "outstanding": 85000},
+    {"name": "Imran", "credit_limit": 500000, "outstanding": 120000},
+    {"name": "Deepak", "credit_limit": 1000000, "outstanding": 350000},
+    {"name": "Vikas", "credit_limit": 50000, "outstanding": 8000},
+    {"name": "Sameer", "credit_limit": 150000, "outstanding": 0},
+    {"name": "Anil", "credit_limit": 75000, "outstanding": 22000}
+  ],
+  "products": [
+    {"name": "Tender Coconut", "grade": 1, "rate": 1500},
+    {"name": "Tender Coconut", "grade": 2, "rate": 1200},
+    {"name": "Tender Coconut", "grade": 3, "rate": 400}
+  ],
+  "note": "Amounts in rupees here. Code converts to paise when loading."
+}
