@@ -448,3 +448,48 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   .customer-row, .promise-row, .sheet-title { padding-inline: 16px; }
   .chip-sort { margin-left: 0; }
 }
+
+/* History: today's sale on top, then one sheet per India day */
+.today-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; overflow: hidden; background: var(--line); border: 1px solid var(--line); border-radius: 14px; }
+.today-strip > div { display: grid; gap: 2px; padding: 14px 18px; background: var(--paper); }
+.today-strip span { font-size: 13px; color: var(--muted); }
+.today-strip strong { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.today-strip > div:first-child strong { color: var(--coconut); }
+.day-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.day-form .field { min-width: 12rem; }
+.filter-note { font-size: 14px; color: var(--muted); }
+.day-head { display: grid; gap: 2px; padding: 12px 20px 10px; border-bottom: 1px solid var(--line); }
+.day-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.day-head p { font-size: 13px; color: var(--muted); }
+.sheet-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-right: 20px; }
+
+/* One bill as a pakka receipt */
+.page-receipt { width: min(560px, 100%); }
+.receipt-sheet { display: grid; gap: 12px; padding: 22px; }
+.receipt-shop { text-align: center; padding-bottom: 12px; border-bottom: 1px dashed var(--rule); }
+.receipt-shop h1 { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+.receipt-shop p { font-size: 14px; color: var(--muted); }
+.receipt-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--muted); }
+.receipt-customer { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.receipt-items th, .receipt-items td { padding-inline: 0; }
+.receipt-totals { display: grid; gap: 4px; padding-top: 10px; border-top: 1px dashed var(--rule); }
+.receipt-totals > div { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.receipt-balance { margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--rule); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .today-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-strip > div:first-child { grid-column: 1 / -1; }
+  .day-head, .sheet-title-row { padding-inline: 16px; }
+  .receipt-items thead { display: table-header-group; }
+  .receipt-items tr { display: table-row; }
+  .receipt-items td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+}
+
+/* Paper: only the receipt, no app chrome */
+@media print {
+  .shell-side, .shell-top, .shell-tabs, .no-print, .crumbs { display: none !important; }
+  .shell-main { margin: 0; padding: 0; }
+  body, .shell { background: #fff; }
+  .page { padding: 0; }
+  .receipt-sheet { border: 0; }
+}

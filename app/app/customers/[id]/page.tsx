@@ -73,7 +73,10 @@ export default async function CustomerPage({ params }: PageProps<"/app/customers
       )}
 
       <section aria-labelledby="ledger-title" className="sheet">
-        <h2 id="ledger-title" className="sheet-title">Hisaab</h2>
+        <div className="sheet-title-row">
+          <h2 id="ledger-title" className="sheet-title">Hisaab</h2>
+          <Link href={`/app/history?customer=${khata.customer.id}`} className="text-link">Iske sab bills</Link>
+        </div>
         <table className="ledger">
           <thead><tr><th scope="col">Kab</th><th scope="col">Kya</th><th scope="col" className="num">Rakam</th><th scope="col" className="num">Udhaar</th></tr></thead>
           <tbody>
