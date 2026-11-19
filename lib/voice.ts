@@ -8,9 +8,10 @@ export type FollowUp =
   | { kind: "grade"; qty: number; unit: Unit }
   | { kind: "payment"; mode?: "cash" | "upi" };
 export type VoiceTurn =
-  | { kind: "confirm" | "review" | "cancel" }
+  | { kind: "confirm"; assentOnly?: true }
+  | { kind: "review" | "cancel" }
   | { kind: "question"; query: "khata"; name?: string }
-  | { kind: "question"; query: "sales" | "topDebt" }
+  | { kind: "question"; query: "sales" | "salesScope" | "topDebt" }
   | { kind: "repeat"; reason: "unclear" | "payment" | "line" }
   | { kind: "edit"; name?: string; entries: BillEntries; followUp?: FollowUp | null };
 
@@ -27,7 +28,7 @@ for (const group of [
   "nahi nahin नहीं", "arre are अरे", "ruk रुको रुक", "hata हटा", "badal बदल",
   "cancel कैंसल कैंसिल रद्द", "rehne रहने", "banao बनाओ", "padho पढ़ो पढ़ो",
   "kuch कुछ", "paise पैसे", "baad बाद", "hazaar hazar hajar hajaar हजार हज़ार",
-  "aaj आज", "kitni कितनी", "kitna कितना", "sale sales सेल बिक्री bikri", "hui हुई",
+  "aaj आज", "kitni कितनी", "kitna कितना", "sale sales सेल सेल्स बिक्री बिकरी bikri", "hui हुई हुयी हुईं huyi",
   "hisaab hisab हिसाब", "bata batao बताओ बता बताइए", "limit लिमिट सीमा",
   "iska इसका", "inka इनका", "sabse सबसे", "zyada zyadaa jyada ज्यादा ज़्यादा", "kiska किसका",
   "lakh lac लाख", "sau सौ", "dedh डेढ़ डेढ़", "dhai ढाई", "saadhe sadhe साढ़े साढ़े",
@@ -163,17 +164,34 @@ function applyPayments(entries: BillEntries, payments: Payment[], total: number)
   return true;
 }
 
+// Match complete report questions so an individual customer's sale or another
+// day's sale is never answered with the shop-wide total for today.
+function isDailySales(text: string): boolean {
+  const request = text.trim().toLowerCase()
+    .replace(/^please\s+/, "")
+    .replace(/^(?:what(?:['’]s| is| are| was| were)|show(?: me)?|tell me|give me) (?:the |my |our )?/, "")
+    .replace(/\b(?:today['’]s|todays|today)\b|टुडे(?:ज़)?/gu, "aaj");
+  const question = normalize(request).replace(/ , /g, " ")
+    .replace(/^(?:arre |bolo |bata |mujhe |मुझे )+/, "")
+    .replace(/ (?:bata(?: do)?|please)$/, "")
+    .replace(/(?:^| )(?:total|टोटल|कुल|kul)(?= )/g, "")
+    .trim();
+  if (/^aaj (?:ki |ka )?(?:kitni |kitna )?sale(?: (?:kitni|kitna|kya|क्या|kitne ki|कितने ki))?(?: hui)?(?: hai)?$/.test(question)) return true;
+  if (/^(?:kitni |kitna )?sale (?:hui )?aaj$/.test(question)) return true;
+  return /^how much (?:did (?:we|i) sell|sale|were (?:the |our )?sale) aaj$/.test(question);
+}
+
 export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean, pending?: FollowUp, accountQuestion = false): VoiceTurn {
   if (!clearSpeech(text)) return { kind: "repeat", reason: "unclear" };
   let command = normalize(text).replace(/^arre /, "");
   if (/^(?:haan(?: pata hai)?(?: ,? ?(?:phir bhi )?(?:bill )?kaat do)?|(?:bill )?kaat do)$/.test(command)) {
-    return { kind: "confirm" };
+    return command.includes("kaat") ? { kind: "confirm" } : { kind: "confirm", assentOnly: true };
   }
   if (/(?:^| , )(?:rehne do(?: , )?)?(?:bill )?cancel(?: kar| kar do)?$|^rehne do$/.test(command)) {
     return { kind: "cancel" };
   }
-  if (/^(?:bill banao|bill padho|dobara padho|फिर से पढ़ो)$/.test(command)) return { kind: "review" };
-  if (/^aaj (?:ki )?(?:kitni sale|sale kitni)(?: hui| hai)?$/.test(command)) return { kind: "question", query: "sales" };
+  if (/^(?:bill banao|bill padho|dobara padho|phir se padho)$/.test(command)) return { kind: "review" };
+  if (/\b(?:sale|sell)\b/.test(command) && isDailySales(text)) return { kind: "question", query: "sales" };
   if (/^sabse zyada udhaar kiska(?: hai)?$/.test(command)) return { kind: "question", query: "topDebt" };
   const namedKhata = command.match(/^([\p{L}\p{M} .'-]+?) (?:ka|ki) (?:(?:hisaab|udhaar|limit)(?: bata| kitna hai)?|kitna udhaar hai)$/u);
   if (namedKhata) return { kind: "question", query: "khata", name: namedKhata[1] };
@@ -283,6 +301,7 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
       continue;
     }
 
+    if (/\bsale\b/.test(fragment)) return { kind: "question", query: "salesScope" };
     if ((needsCustomer || accountQuestion) && !name && clauses.length === 1 && /^[\p{L}\p{M}'-]+(?: [\p{L}\p{M}'-]+){0,3}$/u.test(fragment)
       && !/\b(?:grade|number|piece|crate|bill|udhaar|ka|ko|kar|print|whatsapp|hisaab)\b/.test(fragment)) {
       if (accountQuestion) return { kind: "question", query: "khata", name: fragment };

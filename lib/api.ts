@@ -105,10 +105,19 @@ function answerVoice(db: DatabaseSync, turn: VoiceQuestion, customerId: unknown)
       FROM bills
       WHERE date(created_at, '+05:30') = date('now', '+05:30')
     `).get() as { bills: number; total: number; cash: number; upi: number; udhaar: number };
+    if (!day.bills) return answer("Aaj abhi tak koi bill nahi kata hai.", "आज अभी तक कोई बिल नहीं कटा है।");
+    const split = [
+      day.cash && `Cash ${formatRupees(day.cash)}`,
+      day.upi && `UPI ${formatRupees(day.upi)}`,
+      day.udhaar && `Udhaar ${formatRupees(day.udhaar)}`,
+    ].filter(Boolean).join(", ");
     return answer(
-      `Aaj ${day.bills} bill, ${formatRupees(day.total)} ki sale. Cash ${formatRupees(day.cash)}, UPI ${formatRupees(day.upi)}, udhaar ${formatRupees(day.udhaar)}.`,
-      `आज ${day.bills} बिलों में ${rupees(day.total)} की बिक्री हुई। कैश ${rupees(day.cash)}, यूपीआई ${rupees(day.upi)}, उधार ${rupees(day.udhaar)}।`,
+      `Aaj ${formatRupees(day.total)} ki sale hui. ${day.bills} bill. ${split}.`,
+      `आज ${rupees(day.total)} की बिक्री हुई।`,
     );
+  }
+  if (turn.query === "salesScope") {
+    return answer("Main aaj ki kul sale bata sakta hoon. Poochho, “Aaj kitni sale hui?”", "मैं आज की कुल बिक्री बता सकता हूँ। पूछें, आज कितनी बिक्री हुई?");
   }
   if (turn.query === "topDebt") {
     const top = db.prepare("SELECT name, outstanding_paise AS outstanding FROM customers WHERE outstanding_paise > 0 ORDER BY outstanding_paise DESC, name LIMIT 1")

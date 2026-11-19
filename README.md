@@ -42,6 +42,9 @@ You can also speak in steps. Say “Vikas ko das piece,” then answer “do num
 when Bolo asks for the grade. If it asks how much cash arrived, say the amount.
 You can ask “Vikas ka hisaab batao,” “Aaj kitni sale hui?” or “Sabse zyada
 udhaar kiska hai?” Bolo reads the answer aloud and keeps the current bill.
+“Today sale” also works after a bill is saved. Bolo speaks the total from
+today's saved bills in India time. Chat shows the bill count and payment
+methods used. On an empty day Bolo says “Aaj abhi tak koi bill nahi kata hai.”
 The conversation pane also accepts typed commands. Aarav Mehta is a demo
 owner label for the workspace. On a phone, tap **Current bill** to review the receipt and confirm, or **Bolo assistant** to return to the same conversation.
 

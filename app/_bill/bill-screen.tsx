@@ -240,9 +240,15 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
       if (turn.kind === "answer") {
         setAnswer(turn);
         speakHindi(turn.speech);
+      } else if (locked) {
+        const message = { text: "Nayi entry ke liye Naya bill kholo. Hisaab ya aaj ki sale yahin pooch sakte ho.", speech: "नई एंट्री के लिए नया बिल खोलें। हिसाब या आज की बिक्री यहीं पूछ सकते हैं।" };
+        setAnswer(message);
+        speakHindi(message.speech);
       } else if (turn.kind === "confirm") {
-        if (draft.state === "AWAITING_CONFIRM" && fresh) void confirm();
-        else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
+        if (draft.state === "AWAITING_CONFIRM" && fresh) {
+          if (turn.assentOnly && answer) review();
+          else void confirm();
+        } else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else setError("Pehle bill ka hisaab suno, phir haan bolo.");
       } else if (turn.kind === "review") {
         if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
@@ -303,7 +309,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
   const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
   const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;
-  const micDisabled = locked || saving || voice === "interpreting" || customerOpen || likhoOpen;
+  const micDisabled = saving || voice === "interpreting" || customerOpen || likhoOpen;
 
   function submitText(text: string) {
     if (busy || micDisabled) return;

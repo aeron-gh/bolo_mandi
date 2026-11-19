@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
-import { previewBill, voiceBill } from "../lib/api.ts";
+import { confirmBill, previewBill, voiceBill } from "../lib/api.ts";
 import { loadSeed, openDb, ratesFromSeed, readSeed } from "../lib/db.ts";
 import { rs } from "../lib/money.ts";
 import { hindiReadBack } from "../lib/readback.ts";
@@ -38,8 +38,47 @@ describe("voice billing", () => {
     });
   });
 
-  it("reads sales and highest outstanding balance from the ledger data", () => {
-    expect(say("आज कितनी बिक्री हुई?")).toMatchObject({ kind: "answer", text: expect.stringContaining("0 bill, ₹0") });
+  it.each([
+    "today sale", "आज कितनी बिक्री हुई?", "aaj ki sale", "What are today’s sales?",
+    "आज की टोटल सेल बताओ।", "how much did we sell today?", "sales today",
+    "टुडे सेल", "Aaj sale kitni hui hai?", "Aaj ki bikri bata do",
+  ])("gives a natural no-bills reply for %s", (words) => {
+    expect(say(words)).toMatchObject({
+      kind: "answer", text: "Aaj abhi tak koi bill nahi kata hai.", speech: "आज अभी तक कोई बिल नहीं कटा है।",
+    });
+  });
+
+  it("reports saved bills for the Indian trading day, excluding draft items and other dates", () => {
+    for (const draftId of ["prior", "midnight", "later", "next"]) {
+      expect(confirmBill(db, rates, {
+        draftId, customerId: 1, items: [{ grade: 1, qty: 1 }], cash: rs(500), upi: 0,
+      })).toMatchObject({ status: "saved" });
+    }
+    const stamp = db.prepare("UPDATE bills SET created_at = datetime('now', '+05:30', 'start of day', '-05:30', ?) WHERE draft_id = ?");
+    stamp.run("-1 second", "prior");
+    stamp.run("+0 seconds", "midnight");
+    stamp.run("+12 hours", "later");
+    stamp.run("+1 day", "next");
+    const turn = voiceBill(db, rates, { words: "today sale", items: [{ grade: 3, qty: 99 }], cash: 0, upi: 0,
+      followUp: { kind: "grade", qty: 5, unit: "piece" }, accountQuestion: true });
+    expect(turn).toMatchObject({ kind: "answer", text: "Aaj ₹3,000 ki sale hui. 2 bill. Cash ₹1,000, Udhaar ₹2,000.",
+      speech: "आज 3,000 रुपये की बिक्री हुई।" });
+  });
+
+  it.each(["yesterday's sales", "Vikas ki aaj ki sale", "kal ki sale batao"])("clarifies the available report for %s", (words) => {
+    expect(say(words)).toMatchObject({ kind: "answer", text: expect.stringContaining("aaj ki kul sale") });
+  });
+
+  it("distinguishes a conversational yes from an explicit instruction to save", () => {
+    expect(say("हाँ")).toEqual({ kind: "confirm", assentOnly: true });
+    expect(say("haan, bill kaat do")).toEqual({ kind: "confirm" });
+  });
+
+  it("recognizes a request to read the bill again in Hindi", () => {
+    expect(say("फिर से पढ़ो")).toEqual({ kind: "review" });
+  });
+
+  it("reads highest outstanding balance from the ledger data", () => {
     expect(say("सबसे ज़्यादा उधार किसका है?")).toMatchObject({ kind: "answer", text: expect.stringContaining("Deepak ka hai, ₹3,50,000") });
   });
 
