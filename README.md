@@ -54,6 +54,21 @@ for later use. Bolo starts loading the fallback while you speak when it
 already knows the browser service is unavailable. The browser or OS supplies
 the read-back voice. **Likho** works without the mic.
 
+### Sarvam live transcription
+
+Set `SARVAM_API_KEY` in `.env.local` and run `npm run dev:sarvam`. For a
+production build on a Node host, run `npm run build` and
+`npm run start:sarvam`. The Sarvam server listens on loopback. For HTTPS access
+from other devices, put it behind an authenticated reverse proxy that preserves
+the original Host and WebSocket upgrades, and set `SARVAM_PUBLIC_ORIGIN` to
+the exact public origin (for example `https://bolo.example.com`).
+
+The Sarvam path streams mic audio to Saaras v4 in Fast mode. Interim words
+appear while you hold the mic. Releasing it requests a final Hindi/English
+transcript, which feeds the normal billing workflow. Without a key the app
+uses browser recognition and the on-device fallback. If the streaming
+connection fails, Bolo can transcribe the same recording on-device.
+
 ## Rules the code follows
 
 - Money is whole paise (integers). No floats anywhere.

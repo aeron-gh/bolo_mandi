@@ -5,6 +5,8 @@ import { listenInBrowser } from "./browser-recognition.ts";
 import { MicIcon } from "./icons.tsx";
 import { decodeSpeech, hasSpeech, transcribeOnDevice, warmOnDevice } from "./on-device-speech.ts";
 
+import { listenWithSarvam, sarvamAvailable } from "./sarvam-recognition.ts";
+
 type Props = {
   disabled: boolean;
   onStart: () => void;
@@ -65,7 +67,10 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
   const held = phase === "connecting" || phase === "listening";
   const processing = phase === "recognizing" || phase === "loading";
 
-  useEffect(() => () => session.current?.dispose(), []);
+  useEffect(() => {
+    void sarvamAvailable();
+    return () => session.current?.dispose();
+  }, []);
 
   function start() {
     if (disabled || session.current) return;
@@ -78,7 +83,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     const { signal } = controller;
     let stream: MediaStream | undefined;
     let recorder: MediaRecorder | undefined;
-    let recognition: ReturnType<typeof listenInBrowser>;
+    let recognition: ReturnType<typeof listenInBrowser> | ReturnType<typeof listenWithSarvam>;
     let nativeWords: Promise<string> | undefined;
     let stopLevel: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -163,7 +168,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     onStart();
     setPhase("connecting");
     void navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true } })
-      .then((input) => {
+      .then(async (input) => {
         if (signal.aborted) {
           input.getTracks().forEach((track) => track.stop());
           return;
@@ -174,8 +179,22 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
         recorder.onstop = () => void readRecording();
         recorder.onerror = () => finish("", "Mic se recording nahi hui. Phir se bolo ya Likho kholo.");
         recorder.start();
+        timer = setTimeout(() => finish("", "Ek baar mein 20 second tak bolo."), 20000);
+        const useSarvam = await sarvamAvailable();
+        if (signal.aborted || released) return;
+        const showWords = (text: string) => onWords(clearSpeech(text) ? text : "");
         const track = input.getAudioTracks()[0];
-        if (track) recognition = listenInBrowser(track, (text) => onWords(clearSpeech(text) ? text : ""), warmOnDevice);
+        if (useSarvam && window.AudioContext) {
+          try {
+            const cloud = listenWithSarvam(input, showWords, warmOnDevice);
+            recognition = cloud;
+            await cloud.ready;
+          } catch {
+            // A failed cloud connection can fall back to browser recognition.
+          }
+        }
+        if (signal.aborted || released) return;
+        if (!recognition && track) recognition = listenInBrowser(track, showWords, warmOnDevice);
         if (!recognition) warmOnDevice();
         if (ring.current) {
           try {
@@ -184,7 +203,6 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
             // The level ring is optional.
           }
         }
-        timer = setTimeout(() => finish("", "Ek baar mein 20 second tak bolo."), 20000);
         setPhase("listening");
       })
       .catch((error) => {
