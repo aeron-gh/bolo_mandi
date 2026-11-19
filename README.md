@@ -11,7 +11,7 @@ updates the khata.
 - [x] Billing core: bill maths, payment split, credit limit check, one-time bill save
 - [x] Customer search with fuzzy names ("Afzal" -> ask which one)
 - [x] Vasooli and payment promises
-- [ ] Bill screen
+- [x] Bill screen
 - [ ] Voice in and out
 - [ ] Print and WhatsApp ledger
 - [ ] Daily and truck-wise reports

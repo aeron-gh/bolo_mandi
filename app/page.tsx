@@ -1,18 +1,16 @@
 import Image from "next/image";
+import { ratesFromSeed, readSeed } from "@/lib/db.ts";
+import { BillScreen } from "./_bill/bill-screen.tsx";
 
 export default function Home() {
+  const rates = ratesFromSeed(readSeed());
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-16 text-center">
-      <Image
-        src="/logo.png"
-        alt="Mandi Plus"
-        width={757}
-        height={203}
-        preload
-        className="h-auto w-64 sm:w-80"
-      />
-      <h1 className="text-3xl font-semibold text-brand">Bolo</h1>
-      <p className="max-w-md text-lg">Voice billing for the mandi counter.</p>
-    </main>
+    <>
+      <header className="flex items-center gap-3 border-b border-rule px-4 py-3 sm:px-8">
+        <Image src="/logo.png" alt="Mandi Plus" width={757} height={203} preload className="h-10 w-auto" />
+        <span className="text-xl font-semibold text-brand">Bolo</span>
+      </header>
+      <BillScreen rates={rates} />
+    </>
   );
 }

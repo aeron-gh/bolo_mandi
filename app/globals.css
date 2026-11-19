@@ -1,21 +1,36 @@
 @import "tailwindcss";
 
-/* Brand colours taken from the Mandi Plus logo; light theme for a sunny counter. */
+/* Brand colours from the Mandi Plus logo; light theme for a sunny counter. */
 :root {
-  --background: #ffffff;
-  --foreground: #353639;
+  --paper: #ffffff;
+  --ground: #f3eef9;
+  --ink: #353639;
+  --muted: #6b6c70;
+  --rule: #e4dfec;
   --brand: #5a2792;
+  --brand-deep: #431d6e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-ground: var(--ground);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
   --color-brand: var(--brand);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand-deep: var(--brand-deep);
+  --font-sans: var(--font-poppins);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Torn paper edge at the bottom of the bill slip. */
+.torn-edge {
+  --tooth: 12px;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--tooth) 51% repeat-x,
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth) / 2) no-repeat;
 }
