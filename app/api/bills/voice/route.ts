@@ -1,6 +1,7 @@
 import { voiceBill } from "@/lib/api.ts";
-import { getDb, reply, RATES } from "@/lib/server.ts";
+import { getDb, reply } from "@/lib/server.ts";
+import { getRates } from "@/lib/shop.ts";
 
 export async function POST(req: Request) {
-  return reply(async () => voiceBill(getDb(), RATES, await req.json()));
+  return reply(async () => voiceBill(getDb(), getRates(getDb()), await req.json()));
 }

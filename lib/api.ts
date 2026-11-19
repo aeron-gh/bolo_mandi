@@ -31,7 +31,7 @@ export type BillPreview = {
 
 type Body = Record<string, unknown>;
 
-function asBody(body: unknown): Body {
+export function asBody(body: unknown): Body {
   if (typeof body !== "object" || body === null || Array.isArray(body)) throw new Error("body must be a JSON object");
   return body as Body;
 }
