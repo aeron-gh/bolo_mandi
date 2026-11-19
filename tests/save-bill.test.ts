@@ -98,6 +98,11 @@ describe("saveBill", () => {
     expect(count("bills")).toBe(0);
   });
 
+  it("refuses a bill with no items", () => {
+    expect(() => saveBill(db, draft("Manat", []), RATES)).toThrow(/no items/);
+    expect(count("bills")).toBe(0);
+  });
+
   it("never bills an unknown customer", () => {
     const d: Draft = { draftId: "x", customerId: 9999, items: B01 };
     expect(() => saveBill(db, d, RATES)).toThrow(/unknown customer/);
