@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { User } from "@/lib/accounts.ts";
 import type { Grade, RateCard } from "@/lib/billing.ts";
 import { rs } from "@/lib/money.ts";
 import type { Shop } from "@/lib/shop.ts";
 import { forgetDraft } from "@/app/_bill/draft-store.ts";
 import { Icon } from "@/app/_bill/icons.tsx";
+import { StatusLine, useSubmit, type Status } from "./form-bits.tsx";
 import { messageOf, ownerFetch, useOwnerCall } from "./owner-call.tsx";
 
 type Run = <T>(task: () => Promise<T>) => Promise<T>;
-type Status = { ok: boolean; text: string } | null;
 type Props = { shop: Shop; rates: RateCard; demo: boolean; user: User | null; draftKey: string };
 
 const GRADES: Grade[] = [1, 2, 3];
@@ -28,32 +28,6 @@ function SettingRow({ title, note, children }: { title: string; note: ReactNode;
       <div className="setting-body">{children}</div>
     </section>
   );
-}
-
-function StatusLine({ value }: { value: Status }) {
-  if (!value) return null;
-  return <p className={value.ok ? "form-ok" : "form-error"} role={value.ok ? "status" : "alert"}>{value.text}</p>;
-}
-
-// Submit helper: busy flag, a status line, and the form's fields as a plain object.
-function useSubmit(work: (fields: Record<string, string>, form: HTMLFormElement) => Promise<string>) {
-  const [status, setStatus] = useState<Status>(null);
-  const [busy, setBusy] = useState(false);
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const fields = Object.fromEntries([...new FormData(form)].map(([k, v]) => [k, String(v)]));
-    setBusy(true);
-    setStatus(null);
-    try {
-      setStatus({ ok: true, text: await work(fields, form) });
-    } catch (error) {
-      setStatus({ ok: false, text: messageOf(error) });
-    } finally {
-      setBusy(false);
-    }
-  }
-  return { onSubmit, status, busy };
 }
 
 export function ProfileForms({ shop, rates, demo, user, draftKey }: Props) {

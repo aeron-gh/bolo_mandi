@@ -380,3 +380,71 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 @media (max-width: 720px) {
   .setting { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; }
 }
+
+/* Khata: one sheet of customers, lines between rows, money on the right */
+.page-head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.list-tools { display: grid; gap: 10px; }
+.search-box .input { max-width: 28rem; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); font-size: 14px; font-weight: 600; color: var(--navy); }
+.chip:hover { border-color: #c9ccd6; }
+.chip[aria-current="page"] { border-color: var(--coconut); background: var(--lavender); color: var(--coconut); }
+.chip-sort { margin-left: auto; border-style: dashed; }
+.sheet, .sheet-list:not(.flat) { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.sheet { padding: 6px 0 4px; }
+.sheet-title { padding: 12px 20px 8px; font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.sheet-list > li + li { border-top: 1px solid var(--line); }
+.customer-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 12px 20px; }
+.customer-row:hover { background: #fafbfd; }
+.customer-name, .customer-money { display: grid; gap: 2px; min-width: 0; }
+.customer-name strong { font-size: 16px; overflow-wrap: anywhere; }
+.customer-name small { font-size: 13px; color: var(--muted); }
+.customer-money { justify-items: end; text-align: right; }
+.customer-money strong { font-family: var(--font-display); font-size: 18px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.customer-money small { font-size: 12px; font-weight: 600; }
+.is-advance { color: #1f7a3a; }
+.credit-near { color: #8a5d00; }
+.credit-over { color: var(--red); }
+.empty-state { padding: 40px 20px; text-align: center; background: var(--paper); border: 1px dashed var(--rule); border-radius: 14px; }
+.empty-state h2 { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+.empty-state p { margin-top: 6px; color: var(--muted); }
+
+/* One customer's khata */
+.crumbs { display: flex; gap: 8px; font-size: 14px; color: var(--muted); }
+.crumbs a { color: var(--coconut); font-weight: 600; }
+.khata-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; }
+.khata-head h1 { font-family: var(--font-display); font-size: clamp(28px, 3.4vw, 38px); font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; overflow-wrap: anywhere; }
+.khata-figures { display: flex; gap: 28px; }
+.khata-figures dt { font-size: 13px; color: var(--muted); }
+.khata-figures dd { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.khata-figures .figure-main { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.15; }
+.khata-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.promise-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; }
+.promise-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ledger { width: 100%; border-collapse: collapse; font-size: 15px; }
+.ledger th { padding: 8px 20px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; border-bottom: 1px solid var(--line); }
+.ledger td { padding: 11px 20px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ledger tr:last-child td { border-bottom: 0; }
+.ledger .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ledger .when { white-space: nowrap; color: var(--muted); font-size: 14px; }
+
+/* Form boxes */
+.dialog-wide { width: min(440px, calc(100% - 32px)); }
+.dialog-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 8px 18px; border: 0; padding: 0; margin: 0; }
+.choice-row legend { width: 100%; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--navy); }
+.choice-row label { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; font-size: 15px; }
+.choice-row input { width: 18px; height: 18px; accent-color: var(--coconut); }
+.ask-box { display: grid; gap: 10px; padding: 14px; border-radius: 10px; background: #fff4d6; color: var(--ink); }
+
+@media (max-width: 720px) {
+  .ledger thead { display: none; }
+  .ledger tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .ledger tr:last-child { border-bottom: 0; }
+  .ledger td { padding: 0; border: 0; }
+  .ledger .when { grid-column: 1 / -1; font-size: 13px; }
+  .ledger td:nth-child(4)::before { content: "Udhaar "; color: var(--muted); font-size: 13px; }
+  .khata-figures { gap: 18px; }
+  .customer-row, .promise-row, .sheet-title { padding-inline: 16px; }
+  .chip-sort { margin-left: 0; }
+}
