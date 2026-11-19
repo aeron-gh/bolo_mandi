@@ -4,11 +4,21 @@
 
 A real mandi shop owner will use `/app` every day, at the counter, on the shop's own laptop or tablet:
 make bills, keep each customer's khata, look back at past bills, and manage their own shop details and
-prices. "Production ready" here means: one shop, one device, data that is never lost, and nothing
-changed without the owner's say.
+prices. "Production ready" here means: each owner logs in to their own shop, data is never lost, and
+nothing changes without the owner's say. Visitors can skip login and try a shared demo shop with the
+sample customers (Manat, Afzal, Vikas…).
+
+**Update (owner's answers):** login added — email + password and "Continue with Google"; one shop per
+account; "skip login" opens the demo shop; built to run as a normal Node server with a data folder
+(VPS, Railway, Render or Fly.io with a volume — not serverless hosts, which lose files).
 
 ## Goals
 
+- **Login:** `/login` (email + password, "Continue with Google", "Demo dekhein"), `/signup` (name, email,
+  password, shop name), logout from the profile. `/app` needs a login or the demo choice.
+- **Own shop per account:** `data/accounts.db` holds users and login sessions; each user's shop is
+  `data/shops/<user id>.db`; the demo shop is `data/demo.db`, seeded from `data/seed.json`, with a
+  "Demo reset" button and a banner that it is shared.
 - **Shell:** real pages with a tab bar on phones and a sidebar on laptops:
   `/app` (Bill), `/app/customers` (Khata), `/app/customers/[id]`, `/app/history`,
   `/app/history/[billId]`, `/app/profile`. The owner avatar is clickable and opens the profile.
@@ -32,7 +42,8 @@ changed without the owner's say.
 
 ## Non-goals
 
-- Several shops, accounts, cloud sync, staff roles.
+- Cloud database, staff roles, phone OTP, "forgot password" emails (needs an email service), several
+  shops per account.
 - GST invoices. Sharing a whole khata on WhatsApp (roadmap step 6). Truck reports (step 7).
 - Deleting bills or ledger lines.
 
@@ -56,7 +67,10 @@ changed without the owner's say.
 
 | Decision | Options | Picked |
 | --- | --- | --- |
-| Where it runs | One shop on one device · online for many shops · demo first | **One shop, one device** (owner) |
+| Where it runs | One shop on one device · online for many shops · demo first | First **one shop, one device**; updated to **own shop per account + demo**, Node server with a data folder (owner) |
+| Login | Email + password · phone OTP · Google only | **Email + password + Google** (owner) |
+| Google login | No library (code flow + PKCE, token from Google over TLS) · Auth.js | **No library** (owner) |
+| Account data | One SQLite file per account · one shared database | **One file per account** (owner): shops cannot see each other |
 | Moving around `/app` | Real pages + tab bar · tabs inside one page · sheets over the counter | **Real pages + tab bar** (owner) |
 | Changing tables safely | Numbered migrations tracked in `PRAGMA user_version` · wipe and reseed | **Migrations** (builder's call): real data must survive |
 | Fixing khata mistakes | Adjustment lines with a reason · edit or delete old lines | **Adjustment lines** (builder's call): every rupee stays traceable |
@@ -70,10 +84,25 @@ changed without the owner's say.
 4. `sessions`: PIN unlock tokens with an expiry.
 5. Indexes for history by date and khata by customer.
 
+## Login details
+
+- Passwords: at least 8 characters, stored as salted scrypt hashes; the same error for a wrong email or a
+  wrong password; 5 wrong tries for one email → 5-minute pause.
+- Login session: random 64-hex token in an httpOnly cookie `bolo_user`, valid 30 days, stored in
+  `accounts.db`. Demo choice: cookie `bolo_demo=1`. The owner PIN (cookie `bolo_session`) stays as an
+  optional extra lock inside a shop.
+- Google: authorization code flow with PKCE (S256), random `state` and `nonce` in short-lived httpOnly
+  cookies; the ID token is taken straight from Google's token endpoint over TLS (OIDC Core 3.1.3.7) and
+  checked for issuer, audience, expiry, nonce and verified email. A Google login with the same verified
+  email as an existing account joins that account. Settings come from `.env.local`:
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_ORIGIN`. Without them the Google button is hidden.
+- The in-progress bill on a device is saved per shop, so the demo's draft never appears in a real shop.
+
 ## Build order (each step ships on its own)
 
 | Step | Contents |
 | --- | --- |
+| L | Accounts, login/signup/demo, Google login, every route and page reads the signed-in shop's database |
 | A | Migrations, app shell (tabs/sidebar), draft autosave, Profile & settings (shop info, prices, PIN setup) |
 | B | Customers & khata (list, detail, add/edit, vasooli, promise, adjustment, new bill for customer) |
 | C | History (by day, totals, bill receipt, customer filter) |

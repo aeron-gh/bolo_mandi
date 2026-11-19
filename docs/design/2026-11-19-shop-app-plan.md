@@ -68,6 +68,32 @@ test `tests/shop-api.test.ts`.
 **Tests:** body validation messages; `PinRequired` thrown when a PIN is set and no valid token; prices saved
 are used by the next `previewBill`.
 
+### Task 2b: Accounts, login, Google, one shop per account
+
+**Files:** create `lib/accounts.ts`, `lib/google.ts`, `lib/shops.ts`; rewrite `lib/server.ts` around the
+signed-in shop; routes `app/api/auth/{signup,login,logout,demo,google/start,google/callback}/route.ts`,
+`app/api/demo/reset/route.ts`; pages `app/login/page.tsx`, `app/signup/page.tsx` with client forms in
+`app/_auth/`; every existing route switches from `getDb()` to the request's shop; `.env.example`;
+`scripts/seed.ts` rebuilds the demo shop; tests `tests/accounts.test.ts`, `tests/google.test.ts`.
+
+**Produces:**
+- `openAccounts(file): DatabaseSync`; `signUp(db, {name, email, password}, now): User`;
+  `logIn(db, {email, password}, now): User`; `createUserSession(db, userId, now): string`;
+  `userForSession(db, token, now): User | null`; `endUserSession(db, token)`;
+  `googleUser(db, {sub, email, name, emailVerified}, now): User`. `User = {id, name, email}`.
+- `pkcePair(): {verifier, challenge}`; `googleAuthUrl(cfg, {state, challenge, nonce}): string`;
+  `checkIdToken(idToken, {clientId, nonce, now}): {sub, email, name, emailVerified}`;
+  `exchangeCode(cfg, code, verifier, fetchFn): Promise<string>` (returns the ID token).
+- `DATA_DIR` (env `BOLO_DATA_DIR` or `./data`), `shopFile(userId)`, `DEMO_FILE`, `ACCOUNTS_FILE`.
+- Server: `shopFor(req): {db, mode: "user" | "demo", user}` (throws `LoginRequired` → 401);
+  `currentShop()` for server components (redirects to `/login`).
+
+**Tests:** sign-up validation (email, 8-char password, duplicate email); login works and gives the same
+error for wrong email and wrong password; 5 wrong tries pause that email for 5 minutes; sessions last
+30 days and end on logout; Google user is created once, joined to a same-email password account, refused
+when email not verified; ID token checks reject wrong issuer, audience, expired token, wrong nonce; PKCE
+challenge is base64url SHA-256 of the verifier.
+
 ### Task 3: App shell, profile page, draft restore, start bill for a customer
 
 **Files:** create `app/app/layout.tsx` (server: shop → `AppShell`), `app/_app/app-shell.tsx` (sidebar on lg,
