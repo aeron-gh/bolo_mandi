@@ -31,9 +31,17 @@ npm test         # business rule tests
 npm run dev      # http://localhost:3000
 ```
 
+| Page | What it is |
+| --- | --- |
+| `/` | Bolo product page |
+| `/app` | The counter: voice and touch billing |
+| `/help` | Voice commands and common questions |
+
+Company pages (service charges, support, privacy, terms) link to mandiplus.com.
+
 ## Use the mic
 
-Open Bolo in Chrome on localhost or HTTPS and allow microphone access. Hold
+Open `http://localhost:3000/app` in Chrome (or the HTTPS address) and allow microphone access. Hold
 **Daba ke bolo**, wait for **Sun raha hoon**, speak, then release it. Try “Manat ko 10 piece grade 1
 aur 5 grade 2, 4 hazaar cash.” If several customers match, say the full name or
 choose one from the customer list.

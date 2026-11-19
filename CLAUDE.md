@@ -15,7 +15,9 @@ The README backlog also includes print and WhatsApp ledger sharing, followed by 
 
 ## Run and try it
 
-Use Node 24 or newer. Run `npm ci` and `npm run dev`. Open Chrome at `http://localhost:3000` or use HTTPS, allow microphone access, hold **Daba ke bolo**, wait for **Sun raha hoon**, then speak and release.
+Use Node 24 or newer. Run `npm ci` and `npm run dev`. The counter is at `http://localhost:3000/app` (or the HTTPS address); `/` is the Bolo product page and `/help` lists voice commands. Allow microphone access, hold **Daba ke bolo**, wait for **Sun raha hoon**, then speak and release.
+
+The site uses the mandiplus.com look: brand purple `#4309AC`, Bricolage Grotesque headings, Geist text, Noto Sans Devanagari for Hindi. Shared site pieces live in `app/_site/`. Company pages link to the real mandiplus.com pages (`app/_site/links.ts`); do not copy their text, prices, contacts or images.
 
 **The seed command recreates the database.** The app initializes an empty store from the seed automatically. Use `npm run seed` only when you intend to replace `data/bolo.db` and its SQLite sidecar files.
 
