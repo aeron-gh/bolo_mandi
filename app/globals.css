@@ -158,7 +158,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 
 /* ---------- Counter app at /app ---------- */
 .app-bar { background: var(--paper); border-bottom: 1px solid var(--line); }
-.app-bar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
+.app-bar-row { width: min(1440px, 100%); margin-inline: auto; padding-inline: clamp(16px, 3.3vw, 40px); display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
 .app-bar .wordmark { font-size: 21px; }
 .app-name { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--line); font-weight: 600; color: var(--navy); }
 .app-links { display: flex; align-items: center; gap: 18px; font-size: 14px; color: var(--muted); }
