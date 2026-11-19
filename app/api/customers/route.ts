@@ -1,6 +1,7 @@
 import { connection, type NextRequest } from "next/server";
-import { createCustomer, searchCustomers } from "@/lib/api.ts";
-import { reply, shopFor } from "@/lib/server.ts";
+import { searchCustomers } from "@/lib/api.ts";
+import { newCustomer } from "@/lib/khata-api.ts";
+import { ownerToken, reply, shopFor } from "@/lib/server.ts";
 
 // GET /api/customers?q=Afzal -> found, ambiguous, not_found or unclear
 export async function GET(req: NextRequest) {
@@ -8,7 +9,8 @@ export async function GET(req: NextRequest) {
   return reply(() => searchCustomers(shopFor(req).db, req.nextUrl.searchParams.get("q")));
 }
 
-// POST /api/customers {name} -> only after the trader said "haan, add karo"
+// POST /api/customers {name, phone?, creditLimit?} -> only after the trader said "haan, add karo".
+// A limit above ₹0 needs the owner.
 export async function POST(req: Request) {
-  return reply(async () => createCustomer(shopFor(req).db, await req.json()));
+  return reply(async () => newCustomer(shopFor(req).db, ownerToken(req), new Date(), await req.json()));
 }

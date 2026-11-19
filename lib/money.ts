@@ -17,3 +17,12 @@ export function formatRupees(paise: number): string {
   const format = abs % 100 === 0 ? WHOLE : WITH_PAISE;
   return `${sign}₹${format.format(abs / 100)}`;
 }
+
+// Typed amount -> paise, with string maths so no float rounding: "1,500" -> 150000, "250.5" -> 25050.
+// Anything else (minus, letters, 3+ paise digits) gives null.
+export function parseRupees(text: string): number | null {
+  const match = text.trim().replace(/,/g, "").match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!match) return null;
+  const paise = Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0"));
+  return Number.isSafeInteger(paise) ? paise : null;
+}
