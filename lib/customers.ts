@@ -99,6 +99,19 @@ export function loadCustomers(db: DatabaseSync): Customer[] {
   return db.prepare("SELECT id, name FROM customers ORDER BY id").all() as Customer[];
 }
 
+export type Account = Customer & { outstanding: number; creditLimit: number };
+
+// One customer's money position. Unknown id throws, so nothing is saved for them.
+export function getAccount(db: DatabaseSync, id: number): Account {
+  const account = db
+    .prepare(
+      "SELECT id, name, outstanding_paise AS outstanding, credit_limit_paise AS creditLimit FROM customers WHERE id = ?",
+    )
+    .get(id) as Account | undefined;
+  if (!account) throw new Error(`unknown customer: ${id}`);
+  return account;
+}
+
 // "ramesh  kumar" -> "Ramesh Kumar"
 function displayName(text: string): string {
   return text.trim().split(/\s+/).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");

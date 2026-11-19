@@ -1,6 +1,7 @@
 // Bill maths. Every amount here is whole paise. No floats, no LLM.
 import type { DatabaseSync } from "node:sqlite";
 import { inTransaction } from "./db.ts";
+import { getAccount, type Account } from "./customers.ts";
 
 export type Grade = 1 | 2 | 3;
 export type Unit = "piece" | "crate";
@@ -102,7 +103,6 @@ type BillRow = {
   outstanding_after_paise: number;
   over_limit: number;
 };
-type CustomerRow = { id: number; outstanding_paise: number; credit_limit_paise: number };
 type Paid = { cash: number; upi: number; udhaar: number };
 
 // Turn a stored bill row into a result for the caller.
@@ -145,13 +145,13 @@ function insertBill(db: DatabaseSync, draft: Draft, lines: BillLine[], paid: Pai
 }
 
 // Khata lines: goods given (+), then cash and UPI received (-).
-function writeLedger(db: DatabaseSync, customer: CustomerRow, billId: number, paid: Paid): number {
+function writeLedger(db: DatabaseSync, customer: Account, billId: number, paid: Paid): number {
   const add = db.prepare(
     `INSERT INTO ledger_entries (customer_id, bill_id, kind, mode, amount_paise, balance_after_paise)
      VALUES (?, ?, ?, ?, ?, ?)`,
   );
   const total = paid.cash + paid.upi + paid.udhaar;
-  let balance = customer.outstanding_paise + total;
+  let balance = customer.outstanding + total;
   add.run(customer.id, billId, "bill", null, total, balance);
   for (const mode of ["cash", "upi"] as const) {
     if (paid[mode] === 0) continue;
@@ -168,16 +168,12 @@ export function saveBill(db: DatabaseSync, draft: Draft, rates: RateCard): SaveR
     const existing = findBill(db, "draft_id", draft.draftId);
     if (existing) return toResult(existing, true);
 
-    const customer = db
-      .prepare("SELECT id, outstanding_paise, credit_limit_paise FROM customers WHERE id = ?")
-      .get(draft.customerId) as CustomerRow | undefined;
-    if (!customer) throw new Error(`unknown customer: ${draft.customerId}`);
-
+    const customer = getAccount(db, draft.customerId);
     const bill = calculateBill(draft.items, rates);
     const split = splitPayment(bill.total, draft.cash, draft.upi);
     if (!split.ok) return { status: "needs_answer", reason: "overpaid", extra: split.extra };
 
-    const credit = checkCreditLimit(customer.outstanding_paise, split.udhaar, customer.credit_limit_paise);
+    const credit = checkCreditLimit(customer.outstanding, split.udhaar, customer.creditLimit);
     if (credit.status === "over" && !draft.allowOverLimit) {
       return { status: "needs_answer", reason: "over_limit", overBy: credit.overBy, newOutstanding: credit.newOutstanding };
     }
