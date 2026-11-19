@@ -4,14 +4,15 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { Toaster, toast } from "sonner";
 import { Drawer } from "vaul";
-import type { BillPreview } from "@/lib/api.ts";
+import type { BillPreview, LedgerTask } from "@/lib/api.ts";
 import type { RateCard } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
 import { billReducer, newDraft, newDraftId, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
 import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
+import { advanceQuestion, DROPPED, paymentDone, promiseDone, type Say } from "@/lib/talk.ts";
 import type { FollowUp } from "@/lib/voice.ts";
-import { confirmBill, fetchPreview, friendlyError, interpretBill, type BillBody } from "./api-client.ts";
+import { confirmBill, fetchPreview, friendlyError, interpretBill, recordVaada, recordVasooli, type BillBody } from "./api-client.ts";
 import { Conversation, type Message } from "./conversation.tsx";
 import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
@@ -54,15 +55,15 @@ function speakPreview(preview: BillPreview) {
 
 function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof whatIsMissing>) {
   if (followUp?.kind === "grade") {
-    return [`${followUp.qty} ${followUp.unit}. Kaunsa grade?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"}। कौन सा ग्रेड?`];
+    return [`${followUp.qty} ${followUp.unit} likh liye. Kaunsa grade, 1, 2 ya 3?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"} लिख लिए। कौन सा ग्रेड, एक, दो या तीन?`];
   }
   if (followUp?.kind === "payment") {
-    if (followUp.mode === "cash") return ["Kitna cash mila?", "कितना कैश मिला?"];
-    if (followUp.mode === "upi") return ["Kitna UPI aaya?", "कितनी रकम यूपीआई से आई?"];
-    return ["Kitne rupaye mile, cash ya UPI?", "कितने रुपये मिले, कैश या यूपीआई?"];
+    if (followUp.mode === "cash") return ["Kitna cash mila? Rakam boliye.", "कितना कैश मिला? रकम बोलिए।"];
+    if (followUp.mode === "upi") return ["UPI se kitna aaya? Rakam boliye.", "यूपीआई से कितना आया? रकम बोलिए।"];
+    return ["Kitne rupaye mile, cash ya UPI mein?", "कितने रुपये मिले, कैश या यूपीआई में?"];
   }
-  if (missing === "customer") return ["Kiske naam ka bill banao?", "किसके नाम का बिल बनाऊँ?"];
-  if (missing === "items") return ["Kitne piece ya crate, aur kaunsa grade?", "कितने पीस या क्रेट, और कौन सा ग्रेड?"];
+  if (missing === "customer") return ["Kiske naam ka bill banaun?", "किसके नाम का बिल बनाऊँ?"];
+  if (missing === "items") return ["Kitna maal dena hai? Piece ya crate, aur grade boliye.", "कितना माल देना है? पीस या क्रेट, और ग्रेड बोलिए।"];
   return null;
 }
 
@@ -113,6 +114,8 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const [followUp, setFollowUp] = useState<FollowUp | null>(null);
   const [voiceQuestion, setVoiceQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState<{ text: string; speech: string } | null>(null);
+  // A vasooli or vaada Bolo has said back and is waiting for "haan" on. One draft id, so it saves once.
+  const [task, setTask] = useState<(LedgerTask & { draftId: string }) | null>(null);
   const [accountQuestion, setAccountQuestion] = useState(false);
   const [suggestion, setSuggestion] = useState<CustomerSuggestion | null>(null);
   const [pickNote, setPickNote] = useState<string | null>(null);
@@ -214,12 +217,14 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         dispatch({ type: "reviewAgain" });
         setPreviewVersion((version) => version + 1);
         reviewRequested.current = true;
-        return setError("Hisaab badal gaya. Naya hisaab dekh ke phir se haan bolo.");
+        return setError("Hisaab badal gaya. Naya hisaab dekh kar phir se haan boliye.");
       }
       dispatch({ type: "saved", billId: result.billId });
-      const speech = `बिल नंबर ${result.billId} कट गया।`;
-      setAnswer({ text: `Bill no. ${result.billId} kat gaya.`, speech });
-      speakHindi(speech);
+      const who = draft.customer?.name ?? "";
+      say({
+        text: `Bill ${result.billId} kat gaya. ${who} ka udhaar ab ${formatRupees(result.newOutstanding)} hai. Agla bill boliye.`,
+        speech: `बिल कट गया। ${who} का उधार अब ${formatRupees(result.newOutstanding).slice(1)} रुपये है।`,
+      });
       // Toast after the stamp has landed (at once when motion is reduced).
       const wait = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 450;
       const name = draft.customer?.name ?? "";
@@ -229,6 +234,31 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     } finally {
       saveInFlight.current = false;
       setSaving(false);
+    }
+  }
+
+  function say(line: Say) {
+    setAnswer(line);
+    speakHindi(line.speech);
+  }
+
+  // "Haan" to a vasooli or vaada: save it once, then say what changed.
+  async function runTask(pending: LedgerTask & { draftId: string }) {
+    try {
+      if (pending.action === "promise") {
+        await recordVaada({ draftId: pending.draftId, customerId: pending.customerId, amount: pending.amount, due: pending.due });
+        setTask(null);
+        return say(promiseDone());
+      }
+      const result = await recordVasooli({ draftId: pending.draftId, customerId: pending.customerId, amount: pending.amount, mode: pending.mode, allowAdvance: pending.allowAdvance });
+      if (result.status === "needs_answer") {
+        setTask({ ...pending, allowAdvance: true });
+        return say(advanceQuestion({ name: pending.name, before: pending.amount - result.extra, extra: result.extra }));
+      }
+      setTask(null);
+      say(paymentDone({ name: pending.name, after: result.newOutstanding }));
+    } catch (e) {
+      setError(friendlyError(e));
     }
   }
 
@@ -269,32 +299,48 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
       const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, draft.customer?.id ?? null, followUp, accountQuestion, controller.signal);
       if (controller.signal.aborted) return;
       if (turn.kind !== "repeat") setAccountQuestion(turn.kind === "answer" && Boolean(turn.needsName));
-      if (turn.kind === "answer") {
+      // A new bill line or question means the owner moved on: drop the waiting vasooli or vaada.
+      if (task && (turn.kind === "answer" || turn.kind === "edit" || turn.kind === "review")) setTask(null);
+      if (turn.kind === "task") {
+        setTask(turn.task && { ...turn.task, draftId: newDraftId() });
+        say(turn);
+      } else if (task && turn.kind === "confirm") {
+        await runTask(task);
+      } else if (task && (turn.kind === "deny" || turn.kind === "cancel")) {
+        setTask(null);
+        say(DROPPED);
+      } else if (turn.kind === "deny") {
+        if (draft.state === "AWAITING_CONFIRM") {
+          dispatch({ type: "reviewAgain" });
+          say({ text: "Theek hai, bill abhi nahi kata. Jo badalna hai, boliye.", speech: "ठीक है, बिल अभी नहीं कटा। जो बदलना है, बोलिए।" });
+        } else say({ text: "Theek hai.", speech: "ठीक है।" });
+      } else if (turn.kind === "answer") {
         setAnswer(turn);
         speakHindi(turn.speech);
       } else if (locked) {
-        const message = { text: "Nayi entry ke liye Naya bill kholo. Hisaab ya aaj ki sale yahin pooch sakte ho.", speech: "नई एंट्री के लिए नया बिल खोलें। हिसाब या आज की बिक्री यहीं पूछ सकते हैं।" };
-        setAnswer(message);
-        speakHindi(message.speech);
+        say({
+          text: "Yeh bill kat chuka hai. Naye maal ke liye Naya bill kholiye. Hisaab, vasooli ya vaada yahin bol sakte hain.",
+          speech: "यह बिल कट चुका है। नए माल के लिए नया बिल खोलिए। हिसाब, वसूली या वादा यहीं बोल सकते हैं।",
+        });
       } else if (turn.kind === "confirm") {
         if (draft.state === "AWAITING_CONFIRM" && fresh) {
           if (turn.assentOnly && answer) review();
           else void confirm();
         } else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
-        else setError("Pehle bill ka hisaab suno, phir haan bolo.");
+        else setError("Pehle bill ka hisaab sun lijiye, phir haan boliye.");
       } else if (turn.kind === "review") {
         if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else review();
       } else if (turn.kind === "cancel") {
         setSuggestion(null);
         edit({ type: "cancel" });
-        speakHindi("बिल रद्द हो गया।");
+        say({ text: "Bill radd kar diya. Kuch save nahi hua.", speech: "बिल रद्द कर दिया। कुछ सेव नहीं हुआ।" });
       } else if (turn.kind === "repeat") {
         dispatch({ type: "reviewAgain" });
         const prompt = nextVoiceQuestion(followUp, null) ?? {
-          payment: ["Kitne rupaye cash ya UPI mile?", "कितने रुपये कैश या यूपीआई मिले?"],
-          line: ["Kaunsi line badalni hai? Grade bolo ya Likho mein badlo.", "कौन सी लाइन बदलनी है? ग्रेड बोलें या लिखकर बदलें।"],
-          unclear: ["Bill ke liye naam, kitne piece aur grade bolo. Jaise Manat ko 10 piece grade 1.", "बिल के लिए नाम, कितने पीस और ग्रेड बताएं। जैसे मनत को दस पीस ग्रेड एक।"],
+          payment: ["Kitne rupaye mile, cash ya UPI mein? Rakam ke saath boliye.", "कितने रुपये मिले, कैश या यूपीआई में? रकम के साथ बोलिए।"],
+          line: ["Kaunsi line badalni hai? Grade boliye, ya Likho mein badal dijiye.", "कौन सी लाइन बदलनी है? ग्रेड बोलिए, या लिखो में बदल दीजिए।"],
+          unclear: ["Samajh nahi aaya. Aise boliye: “Manat ko 10 piece grade 1”, ya “Manat ne 5000 cash diye”.", "समझ नहीं आया। ऐसे बोलिए, मनत को दस पीस ग्रेड एक।"],
         }[turn.reason];
         setError(prompt[0]);
         speakHindi(prompt[1]);
@@ -307,8 +353,8 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         if (match && name) {
           setSuggestion(match.kind === "found" ? null : { name, match });
           setPickNote(match.kind === "found" && match.fuzzy ? `"${name}" se milta-julta naam chuna. Galat ho to Badlo.` : null);
-          if (match.kind === "ambiguous") speakHindi("कौन सा ग्राहक? पूरा नाम बोलें या सूची से चुनें।");
-          if (match.kind === "not_found") speakHindi("नाम सूची में नहीं मिला। ग्राहक चुनें।");
+          if (match.kind === "ambiguous") speakHindi("कौन से ग्राहक? पूरा नाम बोलिए, या सूची से चुन लीजिए।");
+          if (match.kind === "not_found") speakHindi("यह नाम सूची में नहीं मिला। ग्राहक चुन लीजिए।");
         }
         if (match?.kind === "ambiguous" || match?.kind === "not_found") setVoiceQuestion(null);
         else askNext(whatIsMissing({ ...draft, ...turn.entries, customer }), pending);
@@ -336,8 +382,8 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     ? preview?.data.credit === "over" ? "Limit se upar hai. Phir bhi bill kaat doon?" : "Hisaab dekh lo. Bill kaat doon?"
     : null;
   const customerQuestion = suggestion?.match.kind === "ambiguous"
-    ? `Kaun sa ${suggestion.name}? Poora naam bolo ya customer chuno.`
-    : suggestion && `"${suggestion.name}" ka naam nahi mila. Phir se bolo ya customer chuno.`;
+    ? `Kaun se ${suggestion.name}? Poora naam boliye, ya list se chun lijiye.`
+    : suggestion && `"${suggestion.name}" naam ka koi customer nahi mila. Naam phir se boliye, ya list se chun lijiye.`;
   const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
   const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
   const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;

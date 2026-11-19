@@ -2,6 +2,7 @@
 import type { BillPreview, VoiceBillResult } from "@/lib/api.ts";
 import type { ItemInput, SaveResult } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
+import type { PaymentResult, PromiseResult } from "@/lib/ledger.ts";
 import type { FollowUp } from "@/lib/voice.ts";
 
 export type BillBody = { customerId: number; items: ItemInput[]; cash: number; upi: number };
@@ -25,6 +26,10 @@ export const fetchPreview = (body: BillBody, signal: AbortSignal) =>
   call<BillPreview>("/api/bills/preview", post(body, signal));
 export const confirmBill = (body: BillBody & { draftId: string; allowOverLimit: boolean }) =>
   call<SaveResult>("/api/bills", post(body));
+export const recordVasooli = (body: { draftId: string; customerId: number; amount: number; mode: "cash" | "upi" | null; allowAdvance: boolean }) =>
+  call<PaymentResult>("/api/payments", post(body));
+export const recordVaada = (body: { draftId: string; customerId: number; amount: number; due: string }) =>
+  call<PromiseResult>("/api/promises", post(body));
 export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, customerId: number | null, followUp: FollowUp | null, accountQuestion: boolean, signal: AbortSignal) =>
   call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, customerId, needsCustomer: customerId === null, followUp, accountQuestion }, signal));
 

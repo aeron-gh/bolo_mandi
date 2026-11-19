@@ -6,7 +6,7 @@ import { SiteIcon } from "../_site/site-icons.tsx";
 
 export const metadata: Metadata = { title: "Bolo Help" };
 
-// Every command here is covered by tests/voice.test.ts or the README's tried examples.
+// Every command here is covered by tests/voice.test.ts, tests/voice-ledger.test.ts or the README's tried examples.
 const COMMANDS = [
   {
     group: "Bill banana",
@@ -20,6 +20,14 @@ const COMMANDS = [
     lines: [
       ["10 hazaar cash, UPI se 20 hazaar aaya.", "Cash aur UPI alag alag. Baaki apne aap udhaar."],
       ["Das hazaar cash.", "Bolo ne poochha kitna mila, to sirf rakam boliye."],
+    ],
+  },
+  {
+    group: "Vasooli aur vaada",
+    lines: [
+      ["Manat ne 5000 cash diye.", "Bolo naya udhaar batakar poochhega 'likh doon?'. Haan kahne par khate mein likhega."],
+      ["Manat ki 5000 vasooli.", "Bill chal raha ho tab bhi 'vasooli' bolne se khate mein jaata hai."],
+      ["Rahul parso 25 hazaar dega.", "Vaada taarikh ke saath likhta hai. Udhaar tab tak wahi rehta hai."],
     ],
   },
   {
@@ -43,6 +51,7 @@ const QUESTIONS = [
   ["Mic kaam nahi kar raha?", "Chrome mein Bolo kholiye aur mic ki permission dijiye. Phone ya tablet par Bolo https wale address se kholiye: browser http par mic band rakhta hai."],
   ["Ek naam ke do log hain?", "Bolo andaaze se nahi chunta. Woh poochhega kaunsa, aap poora naam boliye ya list se chuniye."],
   ["Naya customer kaise jodein?", "Customer chuno mein naam likhiye. List mein na ho to 'add karo' dabaiye. Naye customer ki limit ₹0 se shuru hoti hai, isliye pehle udhaar par Bolo poochhega."],
+  ["Vasooli ya vaada galti se likh jaaye to?", "Bolo pehle sunata hai aur 'haan' ke baad hi likhta hai. 'Nahi' kahiye to kuch nahi likhta. Likha hua badalna ho to khate mein 'Sudhaar' se nayi line jodiye; purani line kabhi nahi mitti."],
   ["Bill kab katta hai?", "Bolo pehle poora hisaab sunata hai. 'Haan, kaat do' bolne ya button dabane ke baad hi bill katta hai. Button do baar dab jaaye, tab bhi bill ek hi banega."],
   ["Internet ya speech service band ho jaaye?", "Browser ki speech service fail ho to Bolo usi recording ko aapke device par hi likhne ki koshish karta hai. Iske liye pehli baar lagbhag 120 MB download hota hai, isliye pehli baar internet chahiye."],
   ["Shor bahut hai, bolna mushkil hai?", "Likho kholiye aur haath se maal aur payment bhariye. Bolo aur Likho ek hi bill par kaam karte hain."],
