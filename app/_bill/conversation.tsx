@@ -35,12 +35,12 @@ export function Conversation({ messages, reply, words, onReplay, onExample, disa
       </div>
       {welcome && <div className="welcome-copy">
         {openBill
-          ? <h2 className="is-open">{openBill}'s bill is open</h2>
+          ? <h2 className="is-open">{openBill}&apos;s bill is open</h2>
           : <h2>Hello{greeting && `, ${greeting}`}</h2>}
         <p>{words || (openBill ? "Keep speaking, or type below." : "Whose bill shall we make? Speak, or type below.")}</p>
         <div className="suggestions">
-          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Today's sales</button>
-          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example}'s account</button>}
+          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Today&apos;s sales</button>
+          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example}&apos;s account</button>}
         </div>
       </div>}
     </div>

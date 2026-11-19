@@ -120,7 +120,7 @@ export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props)
               </div>
             )}
 
-            {match?.kind === "unclear" && <p className="mt-5 text-lg font-semibold">Couldn't read that name. Please type it again.</p>}
+            {match?.kind === "unclear" && <p className="mt-5 text-lg font-semibold">Couldn&apos;t read that name. Please type it again.</p>}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

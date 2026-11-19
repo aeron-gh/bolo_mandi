@@ -492,7 +492,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
           </div>
         </section>
         <section className="rate-strip" aria-labelledby="rates-title">
-          <h2 id="rates-title">Today's rates</h2>
+          <h2 id="rates-title">Today&apos;s rates</h2>
           <dl>{([1, 2, 3] as const).map(grade =>
             <div key={grade}><dt>Grade {grade}</dt><dd>{formatRupees(rates[grade])}</dd></div>
           )}</dl>
