@@ -160,7 +160,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 /* ---------- Counter app at /app ---------- */
 .owner-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--coconut); background: var(--lavender); font-size: 13px; font-weight: 700; }
 
-.workspace { width: min(1440px, 100%); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(310px, 28%); align-items: start; gap: 20px; padding: clamp(16px, 2.5vw, 32px) clamp(16px, 3.3vw, 40px); }
+.workspace { width: min(1440px, 100%); margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 30%); align-items: start; gap: 20px; padding: clamp(16px, 2.5vw, 32px) clamp(16px, 3.3vw, 40px); }
 .manual-entry, .replay, .suggestions button, .bill-action, .customer-picker, .view-switch button, .mobile-review { display: flex; align-items: center; }
 .reply-mark, .send-button { display: grid; flex: none; place-items: center; }
 .view-switch, .mobile-review { display: none; }
@@ -350,7 +350,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
 }
 
 /* The bill as a mandi parchi: a kaccha slip until the owner says haan, dashed rules between its parts */
-.slip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 14px; border-bottom: 1px dashed var(--rule); }
+.slip-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; padding: 16px 20px 14px; border-bottom: 1px dashed var(--rule); }
 .slip-head h2 { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: -0.03em; }
 .slip-state { font-size: 13px; font-weight: 600; color: var(--coconut); }
 .slip-state.saved { color: #1f7a3a; }
@@ -492,4 +492,63 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   body, .shell { background: #fff; }
   .page { padding: 0; }
   .receipt-sheet { border: 0; }
+}
+
+/* Editable kaccha bill: each line, a new line, payment, the limit bar */
+.slip-undo { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--coconut); }
+.slip-undo:disabled { opacity: 0.5; }
+.slip-empty { padding: 2px 0 8px; font-size: 14px; color: var(--muted); }
+.edit-line { display: grid; gap: 8px; margin-inline: -8px; padding: 10px 8px; border-bottom: 1px solid var(--line); border-radius: 8px; }
+.edit-line.is-lit { animation: line-lit 1.6s ease-out; }
+@keyframes line-lit { from { background: var(--lavender); } to { background: transparent; } }
+.edit-line-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.grade-chips { display: flex; gap: 4px; }
+.grade-chips button, .quick-pay button { min-height: 32px; padding: 0 9px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; font-weight: 600; color: var(--muted); }
+.grade-chips button { border-radius: 8px; }
+.grade-chips button[aria-pressed="true"], .quick-pay button[aria-pressed="true"] { border-color: var(--coconut); background: var(--lavender); color: var(--coconut); }
+.line-amount { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stepper { display: inline-flex; align-items: center; overflow: hidden; border: 1px solid #c9ccd6; border-radius: 8px; background: var(--paper); }
+.stepper button { width: 34px; height: 36px; font-size: 18px; font-weight: 600; color: var(--coconut); }
+.stepper button:disabled { color: #b6bac6; }
+.stepper input { width: 46px; height: 36px; border-inline: 1px solid var(--line); text-align: center; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; outline: none; }
+.stepper:focus-within { border-color: var(--coconut); }
+.unit-toggle { min-height: 36px; padding: 0 10px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 13px; color: var(--navy); }
+.rate-field { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted); }
+.rate-field input { width: 66px; height: 36px; padding: 0 6px; border: 1px solid #c9ccd6; border-radius: 8px; background: var(--paper); font-size: 15px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.rate-field input:focus-visible, .add-qty:focus-visible { outline: 2px solid var(--coconut); outline-offset: 1px; }
+.rate-badla { padding: 2px 8px; border-radius: 999px; background: #fff4d6; font-size: 12px; font-weight: 600; color: #8a5d00; }
+.line-remove { margin-left: auto; min-height: 36px; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--red); }
+.add-line { display: grid; gap: 6px; padding: 12px 0 4px; }
+.add-line-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.add-qty { width: 76px; height: 38px; padding: 0 9px; border: 1px solid #c9ccd6; border-radius: 8px; background: var(--paper); font-size: 16px; }
+.add-grade { min-height: 38px; padding: 0 10px; border-radius: 8px; background: var(--lavender); font-size: 13px; font-weight: 700; color: var(--coconut); }
+.add-grade:hover:enabled { background: #e6defb; }
+.pay-edit { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--rule); }
+.pay-boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.money-box { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.money-input { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 10px; border: 1px solid #c9ccd6; border-radius: 8px; background: var(--paper); }
+.money-input:focus-within { border-color: var(--coconut); }
+.money-input input { width: 100%; min-width: 0; font-size: 18px; font-weight: 600; color: var(--ink); outline: none; font-variant-numeric: tabular-nums; }
+.quick-pay { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-pay button { border-radius: 999px; color: var(--navy); }
+.grade-chips button:disabled, .quick-pay button:disabled, .unit-toggle:disabled, .add-grade:disabled, .line-remove:disabled { opacity: 0.5; }
+.limit-bar { display: grid; gap: 6px; margin-top: 10px; font-size: 13px; }
+.limit-track { height: 8px; overflow: hidden; border-radius: 999px; background: #eceef3; }
+.limit-track span { display: block; height: 100%; border-radius: inherit; background: var(--coconut); }
+.limit-bar.credit-near .limit-track span { background: var(--amber); }
+.limit-bar.credit-over .limit-track span { background: var(--red); }
+.limit-bar p { color: var(--muted); }
+.limit-bar strong { color: var(--ink); }
+.limit-bar.credit-near strong { color: #8a5d00; }
+.limit-bar.credit-over strong { color: var(--red); }
+.limit-of { margin-left: 6px; }
+.mini-bill { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .edit-line.is-lit { animation: none; background: var(--lavender); }
+}
+@media (max-width: 820px) {
+  .mini-bill { display: flex; align-items: center; gap: 10px; margin: 0 10px 6px; padding: 9px 12px; border: 1px solid var(--lavender-line); border-radius: 12px; background: var(--lavender); font-size: 13px; color: var(--navy); text-align: left; }
+  .mini-bill-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; color: var(--ink); }
+  .mini-bill strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mini-bill-state { font-weight: 600; color: var(--coconut); }
 }

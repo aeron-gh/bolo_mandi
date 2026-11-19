@@ -3,11 +3,10 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { Toaster, toast } from "sonner";
-import { Drawer } from "vaul";
 import type { BillPreview, LedgerTask } from "@/lib/api.ts";
 import type { RateCard } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
-import { billReducer, newDraft, newDraftId, openEntries, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
+import { billReducer, changedLines, newDraft, newDraftId, openEntries, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
 import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
 import { advanceQuestion, DROPPED, paymentDone, promiseDone, type Say } from "@/lib/talk.ts";
@@ -18,7 +17,6 @@ import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
 import { Dock } from "./dock.tsx";
 import { draftKey, keepDraft, loadDraft } from "./draft-store.ts";
-import { EntryPanel } from "./entry-panel.tsx";
 import { Icon } from "./icons.tsx";
 import { MicButton } from "./mic-button.tsx";
 import { Receipt } from "./receipt.tsx";
@@ -120,7 +118,11 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const [suggestion, setSuggestion] = useState<CustomerSuggestion | null>(null);
   const [pickNote, setPickNote] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
-  const [likhoOpen, setLikhoOpen] = useState(false);
+  // The bill before each change, newest last, so "Wapas karo" (Ctrl+Z) can undo. A new bill starts empty.
+  const [history, setHistory] = useState<BillDraft[]>([]);
+  // Lines voice just changed, lit up for a moment so the owner sees what moved.
+  const [lit, setLit] = useState<number[]>([]);
+  const undoRef = useRef<() => void>(() => {});
 
   const body: BillBody | null = draft.customer
     ? { customerId: draft.customer.id, items: draft.items, cash: draft.cash, upi: draft.upi }
@@ -167,14 +169,38 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   }, [start, startCustomer]);
 
   useEffect(() => {
-    if (!reviewRequested.current || voice !== "idle" || customerOpen || likhoOpen || saving ||
+    if (!reviewRequested.current || voice !== "idle" || customerOpen || saving ||
         draft.state !== "DRAFT" || followUp || whatIsMissing(draft) || !fresh || !preview) return;
     reviewRequested.current = false;
     speakPreview(preview.data);
     if (!preview.data.overpaidBy) dispatch({ type: "readBack", draftId: newDraftId() });
-  }, [customerOpen, draft, followUp, fresh, likhoOpen, preview, saving, voice]);
+  }, [customerOpen, draft, followUp, fresh, preview, saving, voice]);
 
-  function edit(action: Action) {
+  useEffect(() => {
+    if (lit.length === 0) return;
+    const timer = setTimeout(() => setLit([]), 1600);
+    return () => clearTimeout(timer);
+  }, [lit]);
+
+  // Ctrl+Z (Cmd+Z) undoes the last bill change, except while typing in a box.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const typing = event.target instanceof HTMLElement && event.target.closest("input, textarea");
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z" && !typing) {
+        event.preventDefault();
+        undoRef.current();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function remember() {
+    setHistory((past) => [...past.slice(-19), draft]);
+  }
+
+  function edit(action: Action, record = true) {
+    if (record && action.type !== "cancel" && draft.state !== "SAVED" && draft.state !== "CANCELLED") remember();
     reviewRequested.current = false;
     stopSpeaking();
     setError(null);
@@ -260,6 +286,23 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     } catch (e) {
       setError(friendlyError(e));
     }
+  }
+
+  // Undo is an edit: the bill goes back to kaccha and needs a new read-back before "haan".
+  function undo() {
+    const last = history.at(-1);
+    if (!last || saving || voice !== "idle" || draft.state === "SAVED" || draft.state === "CANCELLED") return;
+    setHistory((past) => past.slice(0, -1));
+    edit({ type: "revert", to: last }, false);
+  }
+  useEffect(() => {
+    undoRef.current = undo;
+  });
+
+  // Likho: show the bill and put the cursor in the new-line box.
+  function openEditor() {
+    setMobileView("bill");
+    requestAnimationFrame(() => document.getElementById("add-qty")?.focus());
   }
 
   function startVoice() {
@@ -359,6 +402,8 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         if (match?.kind === "ambiguous" || match?.kind === "not_found") setVoiceQuestion(null);
         else askNext(whatIsMissing({ ...draft, ...turn.entries, customer }), pending);
         reviewRequested.current = !pending;
+        remember();
+        setLit(changedLines(draft.items, turn.entries.items));
         dispatch({ type: "voiceEdit", customer, ...turn.entries });
       }
     } catch (e) {
@@ -387,14 +432,13 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
   const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
   const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;
-  const micDisabled = saving || voice === "interpreting" || customerOpen || likhoOpen;
+  const micDisabled = saving || voice === "interpreting" || customerOpen;
 
   function submitText(text: string) {
     if (busy || micDisabled) return;
     startVoice();
     void finishVoice(text);
   }
-  const panel = <EntryPanel items={draft.items} cash={draft.cash} upi={draft.upi} rates={rates} locked={locked || busy} dispatch={edit} />;
 
   return (
     <main className="workspace" data-mobile-view={mobileView}>
@@ -414,9 +458,16 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
           <MicButton disabled={micDisabled} onStart={startVoice} onWords={setWords}
             onFinish={(text, problem) => void finishVoice(text, problem)} />
         </Conversation>
-        {draft.state === "AWAITING_CONFIRM" && <button className="mobile-review" onClick={() => setMobileView("bill")}>Bill dekho</button>}
+        {!locked && (draft.customer || draft.items.length > 0) && (
+          <button type="button" className="mini-bill" onClick={() => setMobileView("bill")} aria-label="Bill kholo">
+            <span className="mini-bill-name">{draft.customer?.name ?? "Customer chuno"}</span>
+            <span>{draft.items.length} maal</span>
+            <strong>{fresh && preview ? formatRupees(preview.data.total) : "…"}</strong>
+            <span className="mini-bill-state">{draft.state === "AWAITING_CONFIRM" ? "Haan ka intezaar" : "Kaccha"}</span>
+          </button>
+        )}
         {locked && <button className="mobile-review" onClick={onNewBill}>Naya bill</button>}
-        <Dock busy={busy} micDisabled={micDisabled} onType={submitText} onLikho={() => setLikhoOpen(true)} />
+        <Dock busy={busy} micDisabled={micDisabled} onType={submitText} onLikho={openEditor} />
       </section>
 
       <aside id="bill-workspace" aria-label="Bill workspace" className="bill-pane">
@@ -425,13 +476,16 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
             <h2>{SLIP_TITLE[draft.state]}</h2>
             {draft.state === "AWAITING_CONFIRM" && <span className="slip-state">Haan ka intezaar</span>}
             {draft.state === "SAVED" && draft.billId !== null && <span className="slip-state saved">Bill {draft.billId}</span>}
+            {!locked && history.length > 0 && (
+              <button type="button" className="slip-undo" onClick={undo} disabled={busy} title="Pichla badlav wapas karo (Ctrl+Z)">Wapas karo</button>
+            )}
           </header>
           <div className="bill-content">
             <CustomerHeader customer={draft.customer}
               account={preview?.data.customer.id === draft.customer?.id ? preview?.data.customer ?? null : null}
               note={pickNote} locked={locked || busy} onChange={() => setCustomerOpen(true)} />
             <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
-              onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
+              lit={lit} onEdit={edit} onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
             <button type="button" className={`bill-action ${action.tone === "danger" ? "danger" : ""}`}
               onClick={run} disabled={action.disabled || busy || Boolean(followUp)}>{action.label}</button>
             {!locked && (nextQuestion || hint) && <p className="bill-hint">{nextQuestion || hint}</p>}
@@ -448,24 +502,6 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
 
       <CustomerSheet key={suggestion ? `voice:${suggestion.name}` : "manual"} open={customerOpen} suggestion={suggestion} onOpenChange={setCustomerOpen} onPick={pick} />
 
-      <Drawer.Root open={likhoOpen} onOpenChange={setLikhoOpen}>
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-40 bg-ink/40" />
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-2xl bg-canvas outline-none">
-            <div aria-hidden className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-line" />
-            <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
-              <div className="flex items-center justify-between">
-                <Drawer.Title className="text-xl font-semibold">Likho</Drawer.Title>
-                <button onClick={() => setLikhoOpen(false)} className="h-11 rounded-lg px-3 font-semibold text-coconut outline-coconut focus-visible:outline-2">
-                  Ho gaya
-                </button>
-              </div>
-              <Drawer.Description className="sr-only">Maal aur payment haath se likho</Drawer.Description>
-              <div className="mt-3">{panel}</div>
-            </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>
     </main>
   );
 }
