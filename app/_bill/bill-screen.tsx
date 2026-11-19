@@ -51,7 +51,14 @@ function speakPreview(preview: BillPreview) {
   speakHindi([...lines, hindiReadBack({ ...preview, customerName: preview.customer.name })].join(" "));
 }
 
-function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof whatIsMissing>) {
+// When a spoken name matches several customers or none: [English for the bill hint, Hindi for chat and voice].
+function customerAsk({ name, match }: CustomerSuggestion): [string, string] {
+  return match.kind === "ambiguous"
+    ? [`Which ${name}? Say the full name, or pick from the list.`, `कौन से ${name}? पूरा नाम बोलिए, या सूची से चुन लीजिए।`]
+    : [`No customer called "${name}". Say the name again, or pick from the list.`, `"${name}" नाम का कोई ग्राहक नहीं मिला। नाम फिर से बोलिए, या सूची से चुन लीजिए।`];
+}
+
+function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof whatIsMissing>): [string, string] | null {
   if (followUp?.kind === "grade") {
     return [`${followUp.qty} ${followUp.unit} noted. Which grade: 1, 2 or 3?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"} लिख लिए। कौन सा ग्रेड, एक, दो या तीन?`];
   }
@@ -110,7 +117,8 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const voiceRequest = useRef<AbortController | null>(null);
   const reviewRequested = useRef(false);
   const [followUp, setFollowUp] = useState<FollowUp | null>(null);
-  const [voiceQuestion, setVoiceQuestion] = useState<string | null>(null);
+  // Bolo's next question as [English for the bill hint, Hindi for the chat and voice].
+  const [voiceQuestion, setVoiceQuestion] = useState<[string, string] | null>(null);
   const [answer, setAnswer] = useState<{ text: string; speech: string } | null>(null);
   // A vasooli or vaada Bolo has said back and is waiting for "haan" on. One draft id, so it saves once.
   const [task, setTask] = useState<(LedgerTask & { draftId: string }) | null>(null);
@@ -243,7 +251,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         dispatch({ type: "reviewAgain" });
         setPreviewVersion((version) => version + 1);
         reviewRequested.current = true;
-        return setError("The bill changed. Check the new total and say yes again.");
+        return setError("हिसाब बदल गया। नया हिसाब देखकर फिर से हाँ बोलिए।");
       }
       dispatch({ type: "saved", billId: result.billId });
       const who = draft.customer?.name ?? "";
@@ -315,7 +323,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
 
   function askNext(missing: ReturnType<typeof whatIsMissing>, pending: FollowUp | null) {
     const prompt = nextVoiceQuestion(pending, missing);
-    setVoiceQuestion(prompt?.[0] ?? null);
+    setVoiceQuestion(prompt ?? null);
     if (prompt) speakHindi(prompt[1]);
   }
 
@@ -324,8 +332,10 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     if (!text) {
       setVoice("idle");
       if (problem) {
-        setError(problem);
-        if (problem.startsWith("I couldn't hear")) speakHindi("मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलें।");
+        const unheard = problem.startsWith("I couldn't hear");
+        // Bolo's own words show in Hindi; mic and browser problems stay as plain English notices.
+        setError(unheard ? "मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलिए।" : problem);
+        if (unheard) speakHindi("मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलिए।");
       }
       return;
     }
@@ -370,7 +380,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
           if (turn.assentOnly && answer) review();
           else void confirm();
         } else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
-        else setError("Review the bill first, then say yes.");
+        else setError("पहले बिल का हिसाब सुन लीजिए, फिर हाँ बोलिए।");
       } else if (turn.kind === "review") {
         if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else review();
@@ -382,10 +392,10 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         dispatch({ type: "reviewAgain" });
         const prompt = nextVoiceQuestion(followUp, null) ?? {
           payment: ["How much was paid, in cash or UPI? Say it with the amount.", "कितने रुपये मिले, कैश या यूपीआई में? रकम के साथ बोलिए।"],
-          line: ["Which line should change? Say the grade, or edit it on the bill.", "कौन सी लाइन बदलनी है? ग्रेड बोलिए, या लिखो में बदल दीजिए।"],
+          line: ["Which line should change? Say the grade, or edit it on the bill.", "कौन सी लाइन बदलनी है? ग्रेड बोलिए, या बिल पर बदल दीजिए।"],
           unclear: ["I didn't catch that. Try “Manat ko 10 piece grade 1”, or “Manat ne 5000 cash diye”.", "समझ नहीं आया। ऐसे बोलिए, मनत को दस पीस ग्रेड एक।"],
         }[turn.reason];
-        setError(prompt[0]);
+        setError(prompt[1]);
         speakHindi(prompt[1]);
       } else if (turn.kind === "edit") {
         const match = turn.match;
@@ -396,8 +406,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         if (match && name) {
           setSuggestion(match.kind === "found" ? null : { name, match });
           setPickNote(match.kind === "found" && match.fuzzy ? `Picked the closest name to "${name}". Tap Change if it's wrong.` : null);
-          if (match.kind === "ambiguous") speakHindi("कौन से ग्राहक? पूरा नाम बोलिए, या सूची से चुन लीजिए।");
-          if (match.kind === "not_found") speakHindi("यह नाम सूची में नहीं मिला। ग्राहक चुन लीजिए।");
+          if (match.kind !== "found") speakHindi(customerAsk({ name, match })[1]);
         }
         if (match?.kind === "ambiguous" || match?.kind === "not_found") setVoiceQuestion(null);
         else askNext(whatIsMissing({ ...draft, ...turn.entries, customer }), pending);
@@ -423,15 +432,14 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const busy = saving || voice !== "idle";
   const { action, hint } = mainAction(draft, { preview: preview?.data ?? null, fresh }, saving);
   const run = locked ? onNewBill : draft.state === "AWAITING_CONFIRM" ? () => void confirm() : review;
-  const question = draft.state === "AWAITING_CONFIRM" && fresh
-    ? preview?.data.credit === "over" ? "Over the credit limit. Save the bill anyway?" : "Check the bill. Shall I save it?"
+  // While waiting for yes, the chat shows the same Hindi read-back Bolo just spoke.
+  const question = draft.state === "AWAITING_CONFIRM" && fresh && preview
+    ? hindiReadBack({ ...preview.data, customerName: preview.data.customer.name })
     : null;
-  const customerQuestion = suggestion?.match.kind === "ambiguous"
-    ? `Which ${suggestion.name}? Say the full name, or pick from the list.`
-    : suggestion && `No customer called "${suggestion.name}". Say the name again, or pick from the list.`;
-  const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
+  const next = (suggestion ? customerAsk(suggestion) : null) ?? voiceQuestion ?? nextVoiceQuestion(followUp, null);
+  const nextQuestion = next?.[0] ?? null;
   const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
-  const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;
+  const reply = pendingProblem ?? answer?.speech ?? question ?? next?.[1] ?? null;
   const micDisabled = saving || voice === "interpreting" || customerOpen;
 
   function submitText(text: string) {

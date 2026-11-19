@@ -1,9 +1,10 @@
 # English screen text
 
-**Decision (owner, 2026-11-20):** every screen, chat reply and error message is in plain English. Bolo still
-*understands* Hindi and Hinglish speech (the parser in `lib/voice.ts` is unchanged) and still *speaks* Hindi
-aloud (the `speech` side of each reply stays in Devanagari). Voice-command examples on the Help page stay in
-Hinglish, because they are what traders say.
+**Decision (owner, 2026-11-20):** buttons, menus, pages and system messages are in plain English. Bolo
+*understands* Hindi and Hinglish speech (the parser in `lib/voice.ts` is unchanged), *speaks* Hindi aloud, and its
+**chat bubbles show the same Hindi it speaks, in Devanagari** (the `speech` side of each reply). The English `text`
+side feeds the hint under the bill's main button. Voice-command examples on the Help page stay in Hinglish,
+because they are what traders say.
 
 ## Glossary
 

@@ -25,7 +25,7 @@ const COMMANDS = [
   {
     group: "Payments received and promises",
     lines: [
-      ["Manat ne 5000 cash diye.", "Bolo tells you the new credit and asks \"Shall I record it?\". Say yes to save it to the ledger."],
+      ["Manat ne 5000 cash diye.", "Bolo tells you the new credit and asks \"लिख दूँ?\". Say \"haan\" to save it to the ledger."],
       ["Manat ki 5000 vasooli.", "Saying \"vasooli\" records a payment even while a bill is open."],
       ["Rahul parso 25 hazaar dega.", "Records a promise with its date. The credit stays the same until the money comes."],
     ],
@@ -65,7 +65,7 @@ export default function HelpPage() {
         <section className="site-inner pb-12 pt-10 md:pt-16">
           <p className="eyebrow">Bolo Help</p>
           <h1 className="display display-xl mt-5">How to talk to Bolo.</h1>
-          <p className="lead mt-6">Hold the mic, speak, let go. Bolo makes the bill, reads it back, and waits for your yes.</p>
+          <p className="lead mt-6">Hold the mic, speak in Hindi or Hinglish, let go. Bolo makes the bill, reads it back in Hindi, and waits for your yes.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/app" className="btn btn-primary"><SiteIcon name="mic" />Open Bolo</Link>
             <a href="#questions" className="btn btn-outline">Common questions</a>

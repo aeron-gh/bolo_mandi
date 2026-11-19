@@ -53,7 +53,7 @@ function Bubble({ author, text, onReplay }: Message & { onReplay?: (() => void) 
       {author === "bolo" && <span aria-hidden className="reply-mark"><Icon name="sound" /></span>}
       <div className="bubble">
         <span className="sr-only">{author === "owner" ? "You" : "Bolo"} </span>
-        <p>{text}</p>
+        <p lang={/[\u0900-\u097F]/.test(text) ? "hi" : undefined}>{text}</p>
         {onReplay && <button type="button" onClick={onReplay} className="replay"><Icon name="speaker" />Play again</button>}
       </div>
     </article>
