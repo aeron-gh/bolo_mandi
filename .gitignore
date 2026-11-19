@@ -20,3 +20,8 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 coverage/
+
+# deploy
+.vercel
+*.pem
+npm-debug.log*
