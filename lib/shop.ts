@@ -42,6 +42,14 @@ export function updateShop(db: DatabaseSync, input: ShopInput): Shop {
   return getShop(db);
 }
 
+// For a brand-new shop: fill owner and shop name only where still empty.
+export function prefillShop(db: DatabaseSync, input: { ownerName: string; shopName: string }): void {
+  const ownerName = cleanText(input.ownerName, "owner name", 60);
+  const shopName = cleanText(input.shopName, "shop name", 60);
+  db.prepare("UPDATE shop SET owner_name = ? WHERE id = 1 AND owner_name = ''").run(ownerName);
+  db.prepare("UPDATE shop SET shop_name = ? WHERE id = 1 AND shop_name = ''").run(shopName);
+}
+
 export function getRates(db: DatabaseSync): RateCard {
   const rows = db.prepare("SELECT grade, rate_paise FROM rates").all() as { grade: Grade; rate_paise: number }[];
   const rate = (grade: Grade) => {

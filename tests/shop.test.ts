@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
 import { openDb } from "../lib/db.ts";
 import { rs } from "../lib/money.ts";
-import { cleanPhone, getRates, getShop, updateRates, updateShop } from "../lib/shop.ts";
+import { cleanPhone, getRates, getShop, prefillShop, updateRates, updateShop } from "../lib/shop.ts";
 
 let db: DatabaseSync;
 beforeEach(() => {
@@ -54,5 +54,14 @@ describe("price list", () => {
       expect(() => updateRates(db, { 1: bad, 2: rs(1200), 3: rs(400) })).toThrow(/price/);
     }
     expect(getRates(db)).toEqual({ 1: rs(1500), 2: rs(1200), 3: rs(400) });
+  });
+});
+
+describe("prefillShop", () => {
+  it("fills only the empty fields of a new shop, never overwriting the owner's own", () => {
+    prefillShop(db, { ownerName: "Ram Lal", shopName: "Ram Fruit Co" });
+    expect(getShop(db)).toMatchObject({ ownerName: "Ram Lal", shopName: "Ram Fruit Co" });
+    prefillShop(db, { ownerName: "Someone Else", shopName: "Other Shop" });
+    expect(getShop(db)).toMatchObject({ ownerName: "Ram Lal", shopName: "Ram Fruit Co" });
   });
 });
