@@ -1,21 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Anek_Devanagari, Anek_Latin } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 
-// Anek covers English letters and Hindi script with the same feel.
-const anekLatin = Anek_Latin({ variable: "--font-anek-latin", subsets: ["latin"] });
-const anekDeva = Anek_Devanagari({ variable: "--font-anek-deva", subsets: ["devanagari"] });
+// Same faces as mandiplus.com: Bricolage for headings, Geist for text. Noto adds Hindi letters.
+const display = Bricolage_Grotesque({ variable: "--font-display-face", subsets: ["latin"] });
+const body = Geist({ variable: "--font-body", subsets: ["latin"] });
+const hindi = Noto_Sans_Devanagari({ variable: "--font-hindi", subsets: ["devanagari"] });
 
 export const metadata: Metadata = {
-  title: "MandiPlus Bolo",
-  description: "Voice billing for the mandi counter",
+  title: { default: "Bolo · MandiPlus", template: "%s · MandiPlus" },
+  description: "Bolo: bolke bill banao. Voice billing for the mandi counter.",
 };
 
-export const viewport: Viewport = { themeColor: "#f5f5fa" };
+export const viewport: Viewport = { themeColor: "#f5f6fb" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${anekLatin.variable} ${anekDeva.variable} h-full antialiased`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${hindi.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
   );
