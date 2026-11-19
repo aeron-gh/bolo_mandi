@@ -6,7 +6,6 @@ import type { RateCard } from "@/lib/billing.ts";
 import type { BillDraft } from "@/lib/draft.ts";
 import { formatRupees as r } from "@/lib/money.ts";
 
-import { Icon } from "./icons.tsx";
 
 type Props = { draft: BillDraft; preview: BillPreview | null; fresh: boolean; rates: RateCard; blocked: boolean; onCancel: () => void };
 
@@ -32,7 +31,7 @@ export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Pro
   const open = draft.state === "DRAFT" || draft.state === "AWAITING_CONFIRM";
   if (draft.items.length === 0 && open) {
     return <div className="receipt-empty">
-      <div className="empty-lines"><span className="receipt-glyph"><Icon name="receipt" /></span>
+      <div className="empty-lines">
         <h3>Abhi koi maal nahi</h3><p>Grade aur quantity bolo ya Likho mein jodo.</p>
       </div>
       <div className="empty-total"><span>Total</span><strong>{r(0)}</strong></div>
@@ -40,7 +39,7 @@ export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Pro
   }
   return (
     <section aria-label="Bill" className="relative">
-      <div className={`pt-4 ${draft.state === "CANCELLED" ? "opacity-50" : ""}`}>
+      <div className={`slip-section ${draft.state === "CANCELLED" ? "opacity-50" : ""}`}>
         <div className="mb-1 grid grid-cols-[1fr_auto_minmax(3rem,auto)] gap-3 border-b border-line pb-2 text-sm font-semibold text-muted">
           <span>Maal</span><span>Qty × Rate</span><span className="text-right">Rakam</span>
         </div>
@@ -58,10 +57,10 @@ export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Pro
             );
           })}
         </ul>
-        <div className={`mt-2 rounded-xl bg-canvas px-3 py-2 ${p ? "" : "opacity-50"}`}>
-          <div className="mb-1 flex items-baseline justify-between border-b border-line pb-2">
-            <span className="text-lg font-semibold">Total</span>
-            <span className="text-3xl font-bold">{p ? r(p.total) : "…"}</span>
+        <div className={`slip-totals ${p ? "" : "opacity-50"}`}>
+          <div className="slip-total">
+            <span>Total</span>
+            <strong>{p ? r(p.total) : "…"}</strong>
           </div>
           <Row label="Cash" value={r(draft.cash)} />
           <Row label="UPI" value={r(draft.upi)} />
@@ -72,7 +71,7 @@ export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Pro
         {p && open && <Warning p={p} />}
         {draft.state === "CANCELLED" && <p className="mt-3 font-semibold">Bill cancel hua. Kuch save nahi hua.</p>}
         {open && (
-          <button onClick={onCancel} disabled={blocked} className="mt-4 h-11 rounded-lg px-2 font-medium text-muted outline-coconut hover:text-ink focus-visible:outline-2 disabled:opacity-40">
+          <button onClick={onCancel} disabled={blocked} className="mt-2 h-11 rounded-lg font-medium text-muted outline-coconut hover:text-ink focus-visible:outline-2 disabled:opacity-40">
             Bill cancel karo
           </button>
         )}

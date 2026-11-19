@@ -1,6 +1,7 @@
 "use client";
 // Conversation and bill share a draft until the owner confirms the sale.
 import { useEffect, useReducer, useRef, useState } from "react";
+import Link from "next/link";
 import { Toaster, toast } from "sonner";
 import { Drawer } from "vaul";
 import type { BillPreview } from "@/lib/api.ts";
@@ -38,6 +39,11 @@ export function BillScreen({ rates, shopKey, startCustomer, greeting, example }:
 }
 
 type MainAction = { label: string; tone: "go" | "danger"; disabled: boolean };
+
+// In a mandi the rough slip is "kaccha" and the final bill "pakka".
+const SLIP_TITLE: Record<BillDraft["state"], string> = {
+  DRAFT: "Kaccha bill", AWAITING_CONFIRM: "Kaccha bill", SAVED: "Pakka bill", CANCELLED: "Radd bill",
+};
 type Fresh = { preview: BillPreview | null; fresh: boolean };
 type CustomerSuggestion = { name: string; match: CustomerMatch };
 
@@ -347,35 +353,32 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   return (
     <main className="workspace" data-mobile-view={mobileView}>
       <nav aria-label="Workspace view" className="view-switch">
-        <button aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")}><Icon name="chat" />Bolo assistant</button>
-        <button aria-pressed={mobileView === "bill"} onClick={() => setMobileView("bill")}><Icon name="receipt" />Current bill
+        <button aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")}><Icon name="chat" />Bolo</button>
+        <button aria-pressed={mobileView === "bill"} onClick={() => setMobileView("bill")}><Icon name="receipt" />Bill
           {draft.items.length > 0 && <span className="item-count">{draft.items.length}</span>}
         </button>
       </nav>
       <section aria-labelledby="conversation-heading" className="conversation-panel">
-        <header className="panel-heading">
-          <span className="panel-icon"><Icon name="sound" /></span>
-          <h1 id="conversation-heading">Bolo assistant</h1>
-          <span className="language-label"><span aria-hidden>अ</span> Hindi + English</span>
-        </header>
+        <h1 id="conversation-heading" className="sr-only">Bolo se baat</h1>
         <Conversation messages={messages} words={voice === "recording" ? words : ""}
           reply={voice === "idle" ? reply : null}
           onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? () => { if (fresh && preview) speakPreview(preview.data); } : null}
-          onExample={submitText} disabled={busy || micDisabled} greeting={greeting} example={example}>
+          onExample={submitText} disabled={busy || micDisabled} greeting={greeting} example={example}
+          openBill={!locked && draft.customer ? draft.customer.name : null}>
           <MicButton disabled={micDisabled} onStart={startVoice} onWords={setWords}
             onFinish={(text, problem) => void finishVoice(text, problem)} />
         </Conversation>
-        {draft.state === "AWAITING_CONFIRM" && <button className="mobile-review" onClick={() => setMobileView("bill")}>Bill dekho <Icon name="chevron" /></button>}
-        {locked && <button className="mobile-review" onClick={onNewBill}>Naya bill <Icon name="chevron" /></button>}
+        {draft.state === "AWAITING_CONFIRM" && <button className="mobile-review" onClick={() => setMobileView("bill")}>Bill dekho</button>}
+        {locked && <button className="mobile-review" onClick={onNewBill}>Naya bill</button>}
         <Dock busy={busy} micDisabled={micDisabled} onType={submitText} onLikho={() => setLikhoOpen(true)} />
       </section>
 
       <aside id="bill-workspace" aria-label="Bill workspace" className="bill-pane">
         <section className="bill-paper">
-          <header className="panel-heading">
-            <span className="panel-icon"><Icon name="receipt" /></span>
-            <h2>Current bill</h2>
-            <span className="bill-status">{{ DRAFT: "Draft", AWAITING_CONFIRM: "Review", SAVED: "Saved", CANCELLED: "Cancelled" }[draft.state]}</span>
+          <header className="slip-head">
+            <h2>{SLIP_TITLE[draft.state]}</h2>
+            {draft.state === "AWAITING_CONFIRM" && <span className="slip-state">Haan ka intezaar</span>}
+            {draft.state === "SAVED" && draft.billId !== null && <span className="slip-state saved">Bill {draft.billId}</span>}
           </header>
           <div className="bill-content">
             <CustomerHeader customer={draft.customer}
@@ -384,15 +387,16 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
             <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
               onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
             <button type="button" className={`bill-action ${action.tone === "danger" ? "danger" : ""}`}
-              onClick={run} disabled={action.disabled || busy || Boolean(followUp)}>{action.label}<Icon name="chevron" /></button>
+              onClick={run} disabled={action.disabled || busy || Boolean(followUp)}>{action.label}</button>
             {!locked && (nextQuestion || hint) && <p className="bill-hint">{nextQuestion || hint}</p>}
           </div>
         </section>
-        <section className="rate-card" aria-labelledby="rates-title">
-          <h2 id="rates-title"><Icon name="book" />Rate card</h2>
+        <section className="rate-strip" aria-labelledby="rates-title">
+          <h2 id="rates-title">Aaj ke rate</h2>
           <dl>{([1, 2, 3] as const).map(grade =>
             <div key={grade}><dt>Grade {grade}</dt><dd>{formatRupees(rates[grade])}</dd></div>
           )}</dl>
+          <Link href="/app/profile" className="text-link">Badlo</Link>
         </section>
       </aside>
 

@@ -4,7 +4,7 @@ import { Icon } from "./icons.tsx";
 
 export type Message = { author: "owner" | "bolo"; text: string };
 
-export function Conversation({ messages, reply, words, onReplay, onExample, disabled, greeting, example, children }: {
+export function Conversation({ messages, reply, words, onReplay, onExample, disabled, greeting, example, openBill, children }: {
   messages: Message[];
   reply: string | null;
   words: string;
@@ -13,6 +13,7 @@ export function Conversation({ messages, reply, words, onReplay, onExample, disa
   disabled: boolean;
   greeting: string;
   example: string | null;
+  openBill: string | null;
   children: ReactNode;
 }) {
   const feed = useRef<HTMLDivElement>(null);
@@ -33,11 +34,13 @@ export function Conversation({ messages, reply, words, onReplay, onExample, disa
         {children}
       </div>
       {welcome && <div className="welcome-copy">
-        <h2>Namaste{greeting && `, ${greeting}`}<span>.</span></h2>
-        <p>{words || "Aaj kis ka bill banayein? Bolo ya neeche likho."}</p>
+        {openBill
+          ? <h2 className="is-open">{openBill} ka bill khula hai</h2>
+          : <h2>Namaste{greeting && `, ${greeting}`}</h2>}
+        <p>{words || (openBill ? "Aage bolo, ya neeche likho." : "Aaj kis ka bill banayein? Bolo ya neeche likho.")}</p>
         <div className="suggestions">
-          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Aaj ki sale<Icon name="arrow" /></button>
-          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example} ka hisaab<Icon name="arrow" /></button>}
+          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Aaj ki sale</button>
+          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example} ka hisaab</button>}
         </div>
       </div>}
     </div>

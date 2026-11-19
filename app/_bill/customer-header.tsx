@@ -30,7 +30,7 @@ export function CustomerHeader({ customer, account, note, locked, onChange }: Pr
         disabled={locked}
         className="customer-picker"
       >
-        <span className="customer-icon"><Icon name="person" /></span>
+        <Icon name="person" className="size-5 text-coconut" />
         Customer chuno <Icon name="chevron" className="ml-auto size-4" />
       </button>
     );

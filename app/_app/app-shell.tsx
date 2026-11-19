@@ -19,7 +19,7 @@ export function AppShell({ title, subtitle, demo, children }: Props) {
   return (
     <div className="shell">
       <aside className="shell-side">
-        <Link href="/app" className="shell-brand" aria-label="Bolo counter"><Wordmark /></Link>
+        <Link href="/app" className="shell-brand" aria-label="MandiPlus Bolo counter"><Wordmark /><span className="shell-app">Bolo</span></Link>
         <nav className="shell-nav" aria-label="App"><NavLinks /></nav>
         {demo && (
           <div className="demo-card">
@@ -35,7 +35,7 @@ export function AppShell({ title, subtitle, demo, children }: Props) {
       </aside>
       <header className="shell-top">
         <span className="shell-top-brand">
-          <Link href="/app" aria-label="Bolo counter"><Wordmark /></Link>
+          <Link href="/app" aria-label="MandiPlus Bolo counter"><Wordmark /><span className="shell-app">Bolo</span></Link>
           {demo && <Link href="/signup" className="demo-chip">Demo</Link>}
         </span>
         <Link href="/app/profile" className="shell-owner" aria-label={`Profile: ${title}`}>{avatar}</Link>
