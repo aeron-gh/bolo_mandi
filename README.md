@@ -10,11 +10,14 @@ updates the khata.
 
 - [x] Billing core: bill maths, payment split, credit limit check, one-time bill save
 - [x] Customer search with fuzzy names ("Afzal" -> ask which one)
-- [x] Vasooli and payment promises
-- [x] Bill screen
-- [x] Voice billing and Hindi read-back
-- [ ] Print and WhatsApp ledger
-- [ ] Daily and truck-wise reports
+- [x] Vasooli and payment promises, by voice or by hand
+- [x] Bill screen, voice billing and Hindi read-back
+- [x] Login (email + password or Google), one shop per account, demo without login
+- [x] Khata: customer list, running ledger, vasooli, vaade, adjustments with a reason
+- [x] History by India day, printable receipts, WhatsApp share
+- [x] Profile: shop details, rate list, owner PIN, backup download, daily backups
+- [ ] Sharing a whole khata on WhatsApp
+- [ ] Truck-wise reports
 
 ## Stack
 
@@ -26,16 +29,52 @@ Needs Node 24 or newer.
 
 ```bash
 npm install
-npm run seed     # creates data/bolo.db from data/seed.json
+cp .env.example .env.local   # optional: Google login, Sarvam, data folder
+npm run seed     # rebuilds the shared demo shop (data/demo.db) from data/seed.json
 npm test         # business rule tests
 npm run dev      # http://localhost:3000
+npm run dev:https  # same, with a self-signed certificate, for the mic on a tablet
 ```
+
+`npm run seed` only touches the demo shop. Real shops are never reset by it.
 
 | Page | What it is |
 | --- | --- |
 | `/` | Bolo product page |
+| `/login`, `/signup` | Email + password, Google, or "Bina login demo dekhein" |
 | `/app` | The counter: voice and touch billing |
+| `/app/customers` | Khata: every customer, search, "limit ke paas" filter |
+| `/app/customers/[id]` | One customer's ledger, vaade, vasooli, adjustments, edit |
+| `/app/history` | Bills by India day with day totals; `/app/history/[id]` is the receipt |
+| `/app/profile` | Shop details, rate list, owner PIN, backup, logout |
 | `/help` | Voice commands and common questions |
+
+## Accounts and data
+
+Each account gets its own SQLite file, so one shop can never see another's data:
+
+| File | Holds |
+| --- | --- |
+| `data/accounts.db` | Logins and login sessions (passwords are salted scrypt hashes) |
+| `data/shops/<user id>.db` | That account's shop: customers, bills, khata, prices |
+| `data/demo.db` | The shared demo shop with the sample customers |
+| `data/backups/<user id>/` | One backup per India day, the newest 14 kept |
+
+Set `BOLO_DATA_DIR` to move all of this to another folder. The owner PIN is an
+optional second lock inside a shop: once set, changing prices, shop details,
+credit limits, adding adjustments and downloading a backup ask for it.
+
+Google login needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `APP_ORIGIN` in
+`.env.local`. In Google Cloud Console the OAuth client's authorized redirect URI is
+`<APP_ORIGIN>/api/auth/google/callback`. Without these the Google button is hidden.
+
+## Hosting
+
+Bolo keeps its data in files, so it needs a normal Node server with a disk that
+survives restarts: a VPS, or Railway, Render or Fly.io with a volume. Serverless
+hosts lose the files. Run `npm run build` and `npm start` (or `npm run start:sarvam`),
+point `BOLO_DATA_DIR` at the persistent disk, set `APP_ORIGIN` to the public HTTPS
+address, and put the server behind HTTPS (the mic only works on HTTPS or localhost).
 
 Company pages (service charges, support, privacy, terms) link to mandiplus.com.
 
@@ -53,8 +92,14 @@ udhaar kiska hai?” Bolo reads the answer aloud and keeps the current bill.
 “Today sale” also works after a bill is saved. Bolo speaks the total from
 today's saved bills in India time. Chat shows the bill count and payment
 methods used. On an empty day Bolo says “Aaj abhi tak koi bill nahi kata hai.”
-The conversation pane also accepts typed commands. Aarav Mehta is a demo
-owner label for the workspace. On a phone, tap **Current bill** to review the receipt and confirm, or **Bolo assistant** to return to the same conversation.
+The conversation pane also accepts typed commands. On a phone, tap **Bill** to
+review the receipt and confirm, or **Bolo** to return to the same conversation.
+
+Vasooli and vaade work by voice too. Say “Manat ne 5000 cash diye” or “Rahul parso
+25 hazaar dega.” Bolo says back the new udhaar or the due date and asks “likh doon?”.
+Nothing is written until you say “haan”; “nahi” drops it. If the cash or UPI is not
+said, Bolo saves it as “mode nahi bataya” instead of guessing. During an open bill,
+“diye” means that bill's payment; say “vasooli” to write it to the khata instead.
 
 Bolo reads back the total, payment split, new udhaar and any credit warning in
 Hindi using the browser's speech voice. Check the receipt, then say “haan, kaat
@@ -91,4 +136,6 @@ connection fails, Bolo can transcribe the same recording on-device.
 - Every bill has a `draft_id`. Saving the same draft twice gives back the first bill,
   and the database column is `UNIQUE` so a second copy cannot exist.
 - Over the credit limit, a bill is saved only after the trader says yes.
+- A khata line is never edited or deleted. Mistakes are fixed with an adjustment line that says why.
+- Dates are shown in India time; the database stores UTC.
 - `tests/voice_cases.yaml` has 50 spoken commands with expected results (in rupees).
