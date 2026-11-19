@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rs } from "../lib/money.ts";
-import { newDraft, newDraftId, billReducer, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
+import { newDraft, newDraftId, billReducer, restoreDraft, startDraft, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
 import { readBackText, type ReadBackInput } from "../lib/readback.ts";
 
 const MANAT = { id: 1, name: "Manat" };
@@ -169,5 +169,50 @@ describe("readBackText", () => {
 
   it("an advance left after the bill is said as advance", () => {
     expect(readBackText({ ...B01, newOutstanding: -rs(5900) })).toContain("Manat ka ₹5,900 advance jama hai.");
+  });
+});
+
+describe("restoreDraft (bill left open on this device)", () => {
+  const OPEN: BillDraft = {
+    draftId: "a".repeat(32), state: "DRAFT", customer: MANAT, items: [{ grade: 1, qty: 10 }, { grade: 2, qty: 2, unit: "crate", rate: rs(1300) }],
+    cash: rs(500), upi: 0, billId: null,
+  };
+
+  it("comes back as DRAFT with the same id, never as waiting for yes", () => {
+    expect(restoreDraft(OPEN)).toEqual(OPEN);
+    expect(restoreDraft({ ...OPEN, state: "AWAITING_CONFIRM" })).toEqual(OPEN);
+    expect(restoreDraft({ ...OPEN, draftId: null })).toEqual({ ...OPEN, draftId: null });
+  });
+
+  it("never brings back a saved, cancelled or empty bill", () => {
+    expect(restoreDraft({ ...OPEN, state: "SAVED", billId: 4 })).toBeNull();
+    expect(restoreDraft({ ...OPEN, state: "CANCELLED" })).toBeNull();
+    expect(restoreDraft(newDraft())).toBeNull();
+  });
+
+  it("ignores anything that is not a real bill", () => {
+    const junk = [
+      null, "x", 5, {}, { ...OPEN, state: "LISTENING" }, { ...OPEN, items: "no" }, { ...OPEN, items: [{ grade: 4, qty: 1 }] },
+      { ...OPEN, items: [{ grade: 1, qty: 0 }] }, { ...OPEN, items: [{ grade: 1, qty: 2, unit: "box" }] },
+      { ...OPEN, items: [{ grade: 1, qty: 2, rate: 10.5 }] }, { ...OPEN, cash: 1.5 }, { ...OPEN, upi: -100 },
+      { ...OPEN, customer: { id: "1", name: "Manat" } }, { ...OPEN, draftId: 7 },
+    ];
+    for (const saved of junk) expect(restoreDraft(saved)).toBeNull();
+  });
+});
+
+describe("startDraft (what the counter shows first)", () => {
+  const OPEN: BillDraft = { ...newDraft(), customer: MANAT, items: [{ grade: 1, qty: 10 }] };
+
+  it("an open bill wins over a customer asked for in the link", () => {
+    expect(startDraft(OPEN, ANIL)).toEqual({ draft: OPEN, note: "restored" });
+  });
+
+  it("uses the customer from the link when nothing is open", () => {
+    expect(startDraft(null, ANIL)).toEqual({ draft: { ...newDraft(), customer: ANIL }, note: "customer" });
+  });
+
+  it("starts empty otherwise", () => {
+    expect(startDraft("junk", null)).toEqual({ draft: newDraft(), note: null });
   });
 });

@@ -6,9 +6,11 @@ import type { FollowUp } from "@/lib/voice.ts";
 
 export type BillBody = { customerId: number; items: ItemInput[]; cash: number; upi: number };
 
+// A login that ran out sends the owner back to the login page.
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const data = await res.json();
+  if (res.status === 401 && data.error === "login_required") window.location.replace("/login");
   if (!res.ok) throw new Error(data.error ?? `request failed: ${res.status}`);
   return data as T;
 }
@@ -31,6 +33,7 @@ const FRIENDLY: [RegExp, string][] = [
   [/bad qty/, "Har line mein kitne piece, woh likho."],
   [/bad rate/, "Rate sahi likho."],
   [/already exists/, "Is naam ka customer pehle se hai."],
+  [/login_required/, "Login khatam ho gaya. Dobara login karo."],
   [/failed to fetch|networkerror/i, "Server se baat nahi ho pa rahi. App chal raha hai, check karo."],
 ];
 

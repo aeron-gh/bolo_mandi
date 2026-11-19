@@ -4,13 +4,15 @@ import { Icon } from "./icons.tsx";
 
 export type Message = { author: "owner" | "bolo"; text: string };
 
-export function Conversation({ messages, reply, words, onReplay, onExample, disabled, children }: {
+export function Conversation({ messages, reply, words, onReplay, onExample, disabled, greeting, example, children }: {
   messages: Message[];
   reply: string | null;
   words: string;
   onReplay: (() => void) | null;
   onExample: (text: string) => void;
   disabled: boolean;
+  greeting: string;
+  example: string | null;
   children: ReactNode;
 }) {
   const feed = useRef<HTMLDivElement>(null);
@@ -31,11 +33,11 @@ export function Conversation({ messages, reply, words, onReplay, onExample, disa
         {children}
       </div>
       {welcome && <div className="welcome-copy">
-        <h2>Namaste, Aarav<span>.</span></h2>
+        <h2>Namaste{greeting && `, ${greeting}`}<span>.</span></h2>
         <p>{words || "Aaj kis ka bill banayein? Bolo ya neeche likho."}</p>
         <div className="suggestions">
           <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Aaj ki sale<Icon name="arrow" /></button>
-          <button disabled={disabled} onClick={() => onExample("Vikas ka hisaab batao")}><Icon name="book" />Vikas ka hisaab<Icon name="arrow" /></button>
+          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example} ka hisaab<Icon name="arrow" /></button>}
         </div>
       </div>}
     </div>

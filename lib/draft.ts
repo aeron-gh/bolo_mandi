@@ -80,3 +80,44 @@ export function billReducer(draft: BillDraft, action: Action): BillDraft {
       return { ...draft, state: "CANCELLED" };
   }
 }
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const isPaise = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+const isPositive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
+
+// One saved bill line, checked field by field; null if anything is off.
+function readItem(v: unknown): ItemInput | null {
+  if (!isObject(v)) return null;
+  const { grade, qty, rate, unit } = v;
+  if ((grade !== 1 && grade !== 2 && grade !== 3) || !isPositive(qty)) return null;
+  if (rate !== undefined && !isPositive(rate)) return null;
+  if (unit !== undefined && unit !== "piece" && unit !== "crate") return null;
+  return { grade, qty, ...(rate !== undefined && { rate }), ...(unit !== undefined && { unit }) };
+}
+
+// A bill left open on this device. Finished, empty or broken bills give null.
+// A bill that was waiting for "haan" comes back as DRAFT, so it is read back again before saving.
+export function restoreDraft(saved: unknown): BillDraft | null {
+  if (!isObject(saved) || (saved.state !== "DRAFT" && saved.state !== "AWAITING_CONFIRM")) return null;
+  const { draftId, customer, items, cash, upi } = saved;
+  if (draftId !== null && (typeof draftId !== "string" || !/^[0-9a-f]{32}$/.test(draftId))) return null;
+  if (customer !== null && !(isObject(customer) && isPositive(customer.id) && typeof customer.name === "string")) return null;
+  if (!Array.isArray(items) || !isPaise(cash) || !isPaise(upi)) return null;
+  const lines = items.map(readItem);
+  if (lines.some((line) => line === null)) return null;
+  if (customer === null && lines.length === 0) return null;
+  return {
+    draftId, state: "DRAFT", billId: null, cash, upi, items: lines as ItemInput[],
+    customer: customer === null ? null : { id: customer.id as number, name: customer.name as string },
+  };
+}
+
+export type StartNote = "restored" | "customer" | null;
+
+// What the counter shows first: an open bill wins; else the customer from the link; else empty.
+export function startDraft(saved: unknown, customer: Customer | null): { draft: BillDraft; note: StartNote } {
+  const open = restoreDraft(saved);
+  if (open) return { draft: open, note: "restored" };
+  if (customer) return { draft: { ...newDraft(), customer }, note: "customer" };
+  return { draft: newDraft(), note: null };
+}

@@ -6,7 +6,7 @@ import { Drawer } from "vaul";
 import type { BillPreview } from "@/lib/api.ts";
 import type { RateCard } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
-import { billReducer, newDraft, newDraftId, whatIsMissing, type Action, type BillDraft } from "@/lib/draft.ts";
+import { billReducer, newDraft, newDraftId, startDraft, whatIsMissing, type Action, type BillDraft, type StartNote } from "@/lib/draft.ts";
 import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
 import type { FollowUp } from "@/lib/voice.ts";
@@ -15,18 +15,23 @@ import { Conversation, type Message } from "./conversation.tsx";
 import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
 import { Dock } from "./dock.tsx";
+import { draftKey, keepDraft, loadDraft } from "./draft-store.ts";
 import { EntryPanel } from "./entry-panel.tsx";
 import { Icon } from "./icons.tsx";
 import { MicButton } from "./mic-button.tsx";
 import { Receipt } from "./receipt.tsx";
 import { speakHindi, stopSpeaking } from "./speech.ts";
 
-// A new key remounts the workspace, which starts a fresh draft.
-export function BillScreen({ rates }: { rates: RateCard }) {
+type ScreenProps = { rates: RateCard; shopKey: string; startCustomer: Customer | null; greeting: string; example: string | null };
+
+// A new key remounts the workspace, which starts a fresh draft. Only the first round
+// looks for a bill left open on this device or a customer from the link.
+export function BillScreen({ rates, shopKey, startCustomer, greeting, example }: ScreenProps) {
   const [round, setRound] = useState(0);
   return (
     <>
-      <Workspace key={round} rates={rates} onNewBill={() => setRound((n) => n + 1)} />
+      <Workspace key={round} rates={rates} storageKey={draftKey(shopKey)} firstRound={round === 0}
+        startCustomer={startCustomer} greeting={greeting} example={example} onNewBill={() => setRound((n) => n + 1)} />
       <Toaster position="top-center" toastOptions={{ style: { fontFamily: "inherit", fontSize: "1rem" } }} />
     </>
   );
@@ -74,8 +79,19 @@ function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean
   return { action: { label: "Bill banao", tone: "go", disabled: Boolean(hint) }, hint };
 }
 
-function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => void }) {
-  const [draft, dispatch] = useReducer(billReducer, null, newDraft);
+type WorkspaceProps = Omit<ScreenProps, "shopKey"> & { storageKey: string; firstRound: boolean; onNewBill: () => void };
+
+// What to tell the owner about how this bill started.
+function startMessage(note: StartNote, draft: BillDraft, asked: Customer | null): string | null {
+  if (note !== "restored") return null;
+  if (asked && asked.id !== draft.customer?.id) return `Pehle ka adhoora bill khula hai. ${asked.name} ka bill iske baad banao.`;
+  return "Adhoora bill wapas aaya. Dekh kar aage badhao.";
+}
+
+function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, example, onNewBill }: WorkspaceProps) {
+  const [start] = useState(() =>
+    firstRound ? startDraft(loadDraft(storageKey), startCustomer) : { draft: newDraft(), note: null as StartNote });
+  const [draft, dispatch] = useReducer(billReducer, start.draft);
   const [preview, setPreview] = useState<{ key: string; data: BillPreview } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<{ key: string; message: string } | null>(null);
@@ -130,6 +146,16 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
     voiceRequest.current?.abort();
     stopSpeaking();
   }, []);
+
+  // Keep the open bill on this device so a reload or a closed tab does not lose it.
+  useEffect(() => keepDraft(storageKey, draft), [storageKey, draft]);
+
+  // Say once how the bill started, and drop "?customer=" so a reload does not apply it again.
+  useEffect(() => {
+    const message = startMessage(start.note, start.draft, startCustomer);
+    if (message) toast(message, { id: "start-note" });
+    if (startCustomer) window.history.replaceState(null, "", "/app");
+  }, [start, startCustomer]);
 
   useEffect(() => {
     if (!reviewRequested.current || voice !== "idle" || customerOpen || likhoOpen || saving ||
@@ -335,7 +361,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
         <Conversation messages={messages} words={voice === "recording" ? words : ""}
           reply={voice === "idle" ? reply : null}
           onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? () => { if (fresh && preview) speakPreview(preview.data); } : null}
-          onExample={submitText} disabled={busy || micDisabled}>
+          onExample={submitText} disabled={busy || micDisabled} greeting={greeting} example={example}>
           <MicButton disabled={micDisabled} onStart={startVoice} onWords={setWords}
             onFinish={(text, problem) => void finishVoice(text, problem)} />
         </Conversation>
