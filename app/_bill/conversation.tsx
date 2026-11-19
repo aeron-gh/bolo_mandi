@@ -35,12 +35,12 @@ export function Conversation({ messages, reply, words, onReplay, onExample, disa
       </div>
       {welcome && <div className="welcome-copy">
         {openBill
-          ? <h2 className="is-open">{openBill} ka bill khula hai</h2>
-          : <h2>Namaste{greeting && `, ${greeting}`}</h2>}
-        <p>{words || (openBill ? "Aage bolo, ya neeche likho." : "Aaj kis ka bill banayein? Bolo ya neeche likho.")}</p>
+          ? <h2 className="is-open">{openBill}'s bill is open</h2>
+          : <h2>Hello{greeting && `, ${greeting}`}</h2>}
+        <p>{words || (openBill ? "Keep speaking, or type below." : "Whose bill shall we make? Speak, or type below.")}</p>
         <div className="suggestions">
-          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Aaj ki sale</button>
-          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example} ka hisaab</button>}
+          <button disabled={disabled} onClick={() => onExample("Aaj kitni sale hui?")}><Icon name="chart" />Today's sales</button>
+          {example && <button disabled={disabled} onClick={() => onExample(`${example} ka hisaab batao`)}><Icon name="book" />{example}'s account</button>}
         </div>
       </div>}
     </div>
@@ -52,9 +52,9 @@ function Bubble({ author, text, onReplay }: Message & { onReplay?: (() => void) 
     <article className={`chat-message ${author}`}>
       {author === "bolo" && <span aria-hidden className="reply-mark"><Icon name="sound" /></span>}
       <div className="bubble">
-        <span className="sr-only">{author === "owner" ? "Aap" : "Bolo"} </span>
+        <span className="sr-only">{author === "owner" ? "You" : "Bolo"} </span>
         <p>{text}</p>
-        {onReplay && <button type="button" onClick={onReplay} className="replay"><Icon name="speaker" />Phir suno</button>}
+        {onReplay && <button type="button" onClick={onReplay} className="replay"><Icon name="speaker" />Play again</button>}
       </div>
     </article>
   );

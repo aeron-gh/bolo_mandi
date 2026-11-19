@@ -16,23 +16,23 @@ type Props = {
 type Session = { release: () => void; discard: () => void; cancel: () => void; dispose: () => void };
 type Phase = "idle" | "connecting" | "listening" | "recognizing" | "loading";
 
-const REPEAT = "Mujhe saaf sunai nahi diya. Ek baar phir bolo.";
+const REPEAT = "I couldn't hear that clearly. Please say it again.";
 const LABEL: Record<Phase, string> = {
-  idle: "Daba ke bolo",
-  connecting: "Mic jud raha hai",
-  listening: "Sun raha hoon",
-  recognizing: "Awaaz samajh raha hoon",
-  loading: "Hindi voice download ho rahi hai",
+  idle: "Hold to speak",
+  connecting: "Connecting the mic",
+  listening: "Listening",
+  recognizing: "Understanding",
+  loading: "Downloading the speech model",
 };
 
 function micProblem(error: unknown): string {
   if (error instanceof DOMException && error.name === "NotAllowedError") {
-    return "Browser mein mic allow karo, ya Likho kholo.";
+    return "Allow the microphone in your browser, or add items by hand.";
   }
   if (error instanceof DOMException && error.name === "NotFoundError") {
-    return "Microphone nahi mila. Mic jodo ya Likho kholo.";
+    return "No microphone found. Connect one, or add items by hand.";
   }
-  return "Mic se recording nahi hui. Mic check karo ya Likho kholo.";
+  return "The mic didn't record. Check it, or add items by hand.";
 }
 
 function watchLevel(ring: HTMLSpanElement, stream: MediaStream): (() => void) | undefined {
@@ -73,9 +73,9 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
 
   function start() {
     if (disabled || session.current) return;
-    if (!window.isSecureContext) return onFinish("", "Mic sirf HTTPS ya localhost par chalta hai.");
+    if (!window.isSecureContext) return onFinish("", "The mic only works on HTTPS or localhost.");
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      return onFinish("", "Is browser mein recording nahi chalti. Chrome ya Likho try karo.");
+      return onFinish("", "This browser can't record. Try Chrome, or add items by hand.");
     }
 
     const controller = new AbortController();
@@ -117,7 +117,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     function release() {
       if (released) return;
       released = true;
-      if (!recorder) return finish("", "Mic taiyaar hone par phir se daba ke bolo.");
+      if (!recorder) return finish("", "Press and hold again once the mic is ready.");
       setPhase("recognizing");
       stopLevel?.();
       stopLevel = undefined;
@@ -128,7 +128,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     }
 
     async function readRecording() {
-      if (!released) return finish("", "Mic se recording ruk gayi. Phir se bolo ya Likho kholo.");
+      if (!released) return finish("", "The recording stopped. Speak again, or add items by hand.");
       const words = await nativeWords;
       if (signal.aborted) return;
       clearTimeout(timer);
@@ -176,9 +176,9 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
         recorder = new MediaRecorder(input);
         recorder.ondataavailable = ({ data }) => { if (data.size) chunks.push(data); };
         recorder.onstop = () => void readRecording();
-        recorder.onerror = () => finish("", "Mic se recording nahi hui. Phir se bolo ya Likho kholo.");
+        recorder.onerror = () => finish("", "The mic didn't record. Speak again, or add items by hand.");
         recorder.start();
-        timer = setTimeout(() => finish("", "Ek baar mein 20 second tak bolo."), 20000);
+        timer = setTimeout(() => finish("", "Speak for up to 20 seconds at a time."), 20000);
         const useSarvam = await sarvamAvailable();
         if (signal.aborted || released) return;
         const showWords = (text: string) => onWords(clearSpeech(text) ? text : "");
@@ -220,7 +220,7 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     <div className="voice-control">
       <button
         type="button"
-        aria-label="Daba ke bolo"
+        aria-label="Hold to speak"
         aria-pressed={held}
         disabled={disabled || processing}
         onPointerDown={(event) => {

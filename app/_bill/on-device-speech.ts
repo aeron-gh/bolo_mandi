@@ -72,7 +72,7 @@ export function transcribeOnDevice(
       cleanup();
       transcriber.terminate();
       if (worker === transcriber) worker = undefined;
-      reject(new Error("Hindi voice taiyaar nahi hui. Pehli baar internet chahiye. Phir try karo ya Likho kholo."));
+      reject(new Error("The offline speech model isn't ready. The first time needs internet. Try again, or add items by hand."));
     }
 
     function onMessage({ data }: MessageEvent<SpeechMessage>) {

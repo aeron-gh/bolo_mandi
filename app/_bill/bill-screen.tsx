@@ -39,9 +39,9 @@ export function BillScreen({ rates, shopKey, startCustomer, greeting, example }:
 
 type MainAction = { label: string; tone: "go" | "danger"; disabled: boolean };
 
-// In a mandi the rough slip is "kaccha" and the final bill "pakka".
+// The slip's title: a draft until the owner says yes, then the final bill.
 const SLIP_TITLE: Record<BillDraft["state"], string> = {
-  DRAFT: "Kaccha bill", AWAITING_CONFIRM: "Kaccha bill", SAVED: "Pakka bill", CANCELLED: "Radd bill",
+  DRAFT: "Draft bill", AWAITING_CONFIRM: "Draft bill", SAVED: "Final bill", CANCELLED: "Cancelled bill",
 };
 type Fresh = { preview: BillPreview | null; fresh: boolean };
 type CustomerSuggestion = { name: string; match: CustomerMatch };
@@ -53,35 +53,35 @@ function speakPreview(preview: BillPreview) {
 
 function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof whatIsMissing>) {
   if (followUp?.kind === "grade") {
-    return [`${followUp.qty} ${followUp.unit} likh liye. Kaunsa grade, 1, 2 ya 3?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"} लिख लिए। कौन सा ग्रेड, एक, दो या तीन?`];
+    return [`${followUp.qty} ${followUp.unit} noted. Which grade: 1, 2 or 3?`, `${followUp.qty} ${followUp.unit === "crate" ? "क्रेट" : "पीस"} लिख लिए। कौन सा ग्रेड, एक, दो या तीन?`];
   }
   if (followUp?.kind === "payment") {
-    if (followUp.mode === "cash") return ["Kitna cash mila? Rakam boliye.", "कितना कैश मिला? रकम बोलिए।"];
-    if (followUp.mode === "upi") return ["UPI se kitna aaya? Rakam boliye.", "यूपीआई से कितना आया? रकम बोलिए।"];
-    return ["Kitne rupaye mile, cash ya UPI mein?", "कितने रुपये मिले, कैश या यूपीआई में?"];
+    if (followUp.mode === "cash") return ["How much cash? Say the amount.", "कितना कैश मिला? रकम बोलिए।"];
+    if (followUp.mode === "upi") return ["How much by UPI? Say the amount.", "यूपीआई से कितना आया? रकम बोलिए।"];
+    return ["How much was paid, in cash or UPI?", "कितने रुपये मिले, कैश या यूपीआई में?"];
   }
-  if (missing === "customer") return ["Kiske naam ka bill banaun?", "किसके नाम का बिल बनाऊँ?"];
-  if (missing === "items") return ["Kitna maal dena hai? Piece ya crate, aur grade boliye.", "कितना माल देना है? पीस या क्रेट, और ग्रेड बोलिए।"];
+  if (missing === "customer") return ["Whose bill is this?", "किसके नाम का बिल बनाऊँ?"];
+  if (missing === "items") return ["What items? Say the pieces or crates and the grade.", "कितना माल देना है? पीस या क्रेट, और ग्रेड बोलिए।"];
   return null;
 }
 
-// The one big button changes with the bill's state. Nothing saves without "haan".
+// The one big button changes with the bill's state. Nothing saves without a yes.
 function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean): { action: MainAction; hint: string | null } {
   if (draft.state === "SAVED" || draft.state === "CANCELLED") {
-    return { action: { label: "Naya bill", tone: "go", disabled: false }, hint: null };
+    return { action: { label: "New bill", tone: "go", disabled: false }, hint: null };
   }
   if (draft.state === "AWAITING_CONFIRM") {
     const over = preview?.credit === "over";
-    const label = saving ? "Kaat rahe hain" : over ? "Limit ke bahar, phir bhi kaat do" : "Haan, kaat do";
+    const label = saving ? "Saving…" : over ? "Over limit, save anyway" : "Yes, save bill";
     return { action: { label, tone: over ? "danger" : "go", disabled: saving || !fresh }, hint: null };
   }
   const missing = whatIsMissing(draft);
   const hint =
-    missing === "customer" ? "Pehle customer chuno." :
-    missing === "items" ? "Grade aur quantity bolo ya Likho mein jodo." :
-    (preview?.overpaidBy ?? 0) > 0 ? "Cash ya UPI theek karo." :
-    !fresh ? "Hisaab ho raha hai" : null;
-  return { action: { label: "Bill banao", tone: "go", disabled: Boolean(hint) }, hint };
+    missing === "customer" ? "Choose a customer first." :
+    missing === "items" ? "Say the quantity and grade, or add items on the bill." :
+    (preview?.overpaidBy ?? 0) > 0 ? "Fix the cash or UPI amount." :
+    !fresh ? "Working out the bill…" : null;
+  return { action: { label: "Review bill", tone: "go", disabled: Boolean(hint) }, hint };
 }
 
 type WorkspaceProps = Omit<ScreenProps, "shopKey"> & { storageKey: string; firstRound: boolean; onNewBill: () => void };
@@ -89,8 +89,8 @@ type WorkspaceProps = Omit<ScreenProps, "shopKey"> & { storageKey: string; first
 // What to tell the owner about how this bill started.
 function startMessage(note: StartNote, draft: BillDraft, asked: Customer | null): string | null {
   if (note !== "restored") return null;
-  if (asked && asked.id !== draft.customer?.id) return `Pehle ka adhoora bill khula hai. ${asked.name} ka bill iske baad banao.`;
-  return "Adhoora bill wapas aaya. Dekh kar aage badhao.";
+  if (asked && asked.id !== draft.customer?.id) return `An unfinished bill is open. Make ${asked.name}'s bill after this one.`;
+  return "Your unfinished bill is back. Check it and carry on.";
 }
 
 function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, example, onNewBill }: WorkspaceProps) {
@@ -221,7 +221,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
     } else {
       edit({ type: "setCustomer", customer });
     }
-    setPickNote(fuzzyFrom ? `"${fuzzyFrom}" se milta-julta naam chuna. Galat ho to Badlo.` : null);
+    setPickNote(fuzzyFrom ? `Picked the closest name to "${fuzzyFrom}". Tap Change if it's wrong.` : null);
   }
 
   function review() {
@@ -243,18 +243,18 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         dispatch({ type: "reviewAgain" });
         setPreviewVersion((version) => version + 1);
         reviewRequested.current = true;
-        return setError("Hisaab badal gaya. Naya hisaab dekh kar phir se haan boliye.");
+        return setError("The bill changed. Check the new total and say yes again.");
       }
       dispatch({ type: "saved", billId: result.billId });
       const who = draft.customer?.name ?? "";
       say({
-        text: `Bill ${result.billId} kat gaya. ${who} ka udhaar ab ${formatRupees(result.newOutstanding)} hai. Agla bill boliye.`,
+        text: `Bill ${result.billId} saved. ${who}'s credit is now ${formatRupees(result.newOutstanding)}. Ready for the next bill.`,
         speech: `बिल कट गया। ${who} का उधार अब ${formatRupees(result.newOutstanding).slice(1)} रुपये है।`,
       });
       // Toast after the stamp has landed (at once when motion is reduced).
       const wait = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 450;
       const name = draft.customer?.name ?? "";
-      setTimeout(() => toast.success(`Bill no. ${result.billId} kat gaya`, { description: `${name} ka udhaar ab ${formatRupees(result.newOutstanding)}` }), wait);
+      setTimeout(() => toast.success(`Bill ${result.billId} saved`, { description: `${name}'s credit is now ${formatRupees(result.newOutstanding)}` }), wait);
     } catch (e) {
       setError(friendlyError(e));
     } finally {
@@ -325,7 +325,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
       setVoice("idle");
       if (problem) {
         setError(problem);
-        if (problem.startsWith("Mujhe saaf sunai")) speakHindi("मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलें।");
+        if (problem.startsWith("I couldn't hear")) speakHindi("मुझे साफ़ सुनाई नहीं दिया। एक बार फिर बोलें।");
       }
       return;
     }
@@ -355,14 +355,14 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
       } else if (turn.kind === "deny") {
         if (draft.state === "AWAITING_CONFIRM") {
           dispatch({ type: "reviewAgain" });
-          say({ text: "Theek hai, bill abhi nahi kata. Jo badalna hai, boliye.", speech: "ठीक है, बिल अभी नहीं कटा। जो बदलना है, बोलिए।" });
-        } else say({ text: "Theek hai.", speech: "ठीक है।" });
+          say({ text: "Okay, the bill is not saved yet. Tell me what to change.", speech: "ठीक है, बिल अभी नहीं कटा। जो बदलना है, बोलिए।" });
+        } else say({ text: "Okay.", speech: "ठीक है।" });
       } else if (turn.kind === "answer") {
         setAnswer(turn);
         speakHindi(turn.speech);
       } else if (locked) {
         say({
-          text: "Yeh bill kat chuka hai. Naye maal ke liye Naya bill kholiye. Hisaab, vasooli ya vaada yahin bol sakte hain.",
+          text: "This bill is already saved. Open a new bill for more items. You can still ask about accounts, payments or promises here.",
           speech: "यह बिल कट चुका है। नए माल के लिए नया बिल खोलिए। हिसाब, वसूली या वादा यहीं बोल सकते हैं।",
         });
       } else if (turn.kind === "confirm") {
@@ -370,20 +370,20 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
           if (turn.assentOnly && answer) review();
           else void confirm();
         } else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
-        else setError("Pehle bill ka hisaab sun lijiye, phir haan boliye.");
+        else setError("Review the bill first, then say yes.");
       } else if (turn.kind === "review") {
         if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else review();
       } else if (turn.kind === "cancel") {
         setSuggestion(null);
         edit({ type: "cancel" });
-        say({ text: "Bill radd kar diya. Kuch save nahi hua.", speech: "बिल रद्द कर दिया। कुछ सेव नहीं हुआ।" });
+        say({ text: "Bill cancelled. Nothing was saved.", speech: "बिल रद्द कर दिया। कुछ सेव नहीं हुआ।" });
       } else if (turn.kind === "repeat") {
         dispatch({ type: "reviewAgain" });
         const prompt = nextVoiceQuestion(followUp, null) ?? {
-          payment: ["Kitne rupaye mile, cash ya UPI mein? Rakam ke saath boliye.", "कितने रुपये मिले, कैश या यूपीआई में? रकम के साथ बोलिए।"],
-          line: ["Kaunsi line badalni hai? Grade boliye, ya Likho mein badal dijiye.", "कौन सी लाइन बदलनी है? ग्रेड बोलिए, या लिखो में बदल दीजिए।"],
-          unclear: ["Samajh nahi aaya. Aise boliye: “Manat ko 10 piece grade 1”, ya “Manat ne 5000 cash diye”.", "समझ नहीं आया। ऐसे बोलिए, मनत को दस पीस ग्रेड एक।"],
+          payment: ["How much was paid, in cash or UPI? Say it with the amount.", "कितने रुपये मिले, कैश या यूपीआई में? रकम के साथ बोलिए।"],
+          line: ["Which line should change? Say the grade, or edit it on the bill.", "कौन सी लाइन बदलनी है? ग्रेड बोलिए, या लिखो में बदल दीजिए।"],
+          unclear: ["I didn't catch that. Try “Manat ko 10 piece grade 1”, or “Manat ne 5000 cash diye”.", "समझ नहीं आया। ऐसे बोलिए, मनत को दस पीस ग्रेड एक।"],
         }[turn.reason];
         setError(prompt[0]);
         speakHindi(prompt[1]);
@@ -395,7 +395,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         setFollowUp(pending);
         if (match && name) {
           setSuggestion(match.kind === "found" ? null : { name, match });
-          setPickNote(match.kind === "found" && match.fuzzy ? `"${name}" se milta-julta naam chuna. Galat ho to Badlo.` : null);
+          setPickNote(match.kind === "found" && match.fuzzy ? `Picked the closest name to "${name}". Tap Change if it's wrong.` : null);
           if (match.kind === "ambiguous") speakHindi("कौन से ग्राहक? पूरा नाम बोलिए, या सूची से चुन लीजिए।");
           if (match.kind === "not_found") speakHindi("यह नाम सूची में नहीं मिला। ग्राहक चुन लीजिए।");
         }
@@ -424,11 +424,11 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
   const { action, hint } = mainAction(draft, { preview: preview?.data ?? null, fresh }, saving);
   const run = locked ? onNewBill : draft.state === "AWAITING_CONFIRM" ? () => void confirm() : review;
   const question = draft.state === "AWAITING_CONFIRM" && fresh
-    ? preview?.data.credit === "over" ? "Limit se upar hai. Phir bhi bill kaat doon?" : "Hisaab dekh lijiye. Bill kaat doon?"
+    ? preview?.data.credit === "over" ? "Over the credit limit. Save the bill anyway?" : "Check the bill. Shall I save it?"
     : null;
   const customerQuestion = suggestion?.match.kind === "ambiguous"
-    ? `Kaun se ${suggestion.name}? Poora naam boliye, ya list se chun lijiye.`
-    : suggestion && `"${suggestion.name}" naam ka koi customer nahi mila. Naam phir se boliye, ya list se chun lijiye.`;
+    ? `Which ${suggestion.name}? Say the full name, or pick from the list.`
+    : suggestion && `No customer called "${suggestion.name}". Say the name again, or pick from the list.`;
   const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
   const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
   const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;
@@ -449,7 +449,7 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         </button>
       </nav>
       <section aria-labelledby="conversation-heading" className="conversation-panel">
-        <h1 id="conversation-heading" className="sr-only">Bolo se baat</h1>
+        <h1 id="conversation-heading" className="sr-only">Talk to Bolo</h1>
         <Conversation messages={messages} words={voice === "recording" ? words : ""}
           reply={voice === "idle" ? reply : null}
           onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? () => { if (fresh && preview) speakPreview(preview.data); } : null}
@@ -459,14 +459,14 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
             onFinish={(text, problem) => void finishVoice(text, problem)} />
         </Conversation>
         {!locked && (draft.customer || draft.items.length > 0) && (
-          <button type="button" className="mini-bill" onClick={() => setMobileView("bill")} aria-label="Bill kholo">
-            <span className="mini-bill-name">{draft.customer?.name ?? "Customer chuno"}</span>
+          <button type="button" className="mini-bill" onClick={() => setMobileView("bill")} aria-label="Open the bill">
+            <span className="mini-bill-name">{draft.customer?.name ?? "Choose customer"}</span>
             <span>{draft.items.length} maal</span>
             <strong>{fresh && preview ? formatRupees(preview.data.total) : "…"}</strong>
-            <span className="mini-bill-state">{draft.state === "AWAITING_CONFIRM" ? "Haan ka intezaar" : "Kaccha"}</span>
+            <span className="mini-bill-state">{draft.state === "AWAITING_CONFIRM" ? "Waiting for yes" : "Draft"}</span>
           </button>
         )}
-        {locked && <button className="mobile-review" onClick={onNewBill}>Naya bill</button>}
+        {locked && <button className="mobile-review" onClick={onNewBill}>New bill</button>}
         <Dock busy={busy} micDisabled={micDisabled} onType={submitText} onLikho={openEditor} />
       </section>
 
@@ -474,10 +474,10 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
         <section className="bill-paper">
           <header className="slip-head">
             <h2>{SLIP_TITLE[draft.state]}</h2>
-            {draft.state === "AWAITING_CONFIRM" && <span className="slip-state">Haan ka intezaar</span>}
+            {draft.state === "AWAITING_CONFIRM" && <span className="slip-state">Waiting for yes</span>}
             {draft.state === "SAVED" && draft.billId !== null && <span className="slip-state saved">Bill {draft.billId}</span>}
             {!locked && history.length > 0 && (
-              <button type="button" className="slip-undo" onClick={undo} disabled={busy} title="Pichla badlav wapas karo (Ctrl+Z)">Wapas karo</button>
+              <button type="button" className="slip-undo" onClick={undo} disabled={busy} title="Undo the last change (Ctrl+Z)">Undo</button>
             )}
           </header>
           <div className="bill-content">
@@ -492,11 +492,11 @@ function Workspace({ rates, storageKey, firstRound, startCustomer, greeting, exa
           </div>
         </section>
         <section className="rate-strip" aria-labelledby="rates-title">
-          <h2 id="rates-title">Aaj ke rate</h2>
+          <h2 id="rates-title">Today's rates</h2>
           <dl>{([1, 2, 3] as const).map(grade =>
             <div key={grade}><dt>Grade {grade}</dt><dd>{formatRupees(rates[grade])}</dd></div>
           )}</dl>
-          <Link href="/app/profile" className="text-link">Badlo</Link>
+          <Link href="/app/profile" className="text-link">Change</Link>
         </section>
       </aside>
 

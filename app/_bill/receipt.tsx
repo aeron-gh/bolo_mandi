@@ -1,5 +1,5 @@
 "use client";
-// The bill slip. While kaccha every part is editable; pakka and radd bills are read-only.
+// The bill slip. While a draft every part is editable; final and cancelled bills are read-only.
 // Rows come from the draft at once; amounts come from the server preview.
 import type { ReactNode } from "react";
 import type { BillPreview } from "@/lib/api.ts";
@@ -22,12 +22,12 @@ function Row({ label, value, strong }: { label: ReactNode; value: string; strong
   );
 }
 
-// Read-only lines for a pakka or radd bill.
+// Read-only lines for a final or cancelled bill.
 function FixedLines({ items, rates, preview }: { items: ItemInput[]; rates: RateCard; preview: BillPreview | null }) {
   return (
     <>
       <div className="mb-1 grid grid-cols-[1fr_auto_minmax(3rem,auto)] gap-3 border-b border-line pb-2 text-sm font-semibold text-muted">
-        <span>Maal</span><span>Qty × Rate</span><span className="text-right">Rakam</span>
+        <span>Item</span><span>Qty × Rate</span><span className="text-right">Amount</span>
       </div>
       <ul className="divide-y divide-line">
         {items.map((item, i) => (
@@ -53,7 +53,7 @@ export function Receipt({ draft, preview, fresh, rates, blocked, lit, onEdit, on
       <div className={`slip-section ${draft.state === "CANCELLED" ? "opacity-50" : ""}`}>
         {open ? (
           <>
-            {draft.items.length === 0 && <p className="slip-empty">Abhi koi maal nahi. Boliye, ya yahin jodiye.</p>}
+            {draft.items.length === 0 && <p className="slip-empty">No items yet. Speak, or add them here.</p>}
             <ul className="edit-lines">
               {draft.items.map((item, i) => (
                 <LineEditor key={i} index={i} item={item} listRate={rates[item.grade]} locked={locked} lit={lit.includes(i)}
@@ -81,29 +81,28 @@ export function Receipt({ draft, preview, fresh, rates, blocked, lit, onEdit, on
             </div>
             {!open && <Row label="Cash" value={r(draft.cash)} />}
             {!open && <Row label="UPI" value={r(draft.upi)} />}
-            <Row label="Udhaar" value={p ? r(p.udhaar) : "…"} strong />
-            {p && <Row label="Naya udhaar" value={r(p.newOutstanding)} />}
+            <Row label="On credit" value={p ? r(p.udhaar) : "…"} strong />
+            {p && <Row label="New credit total" value={r(p.newOutstanding)} />}
           </div>
         )}
         {p && open && draft.items.length > 0 && (
           <LimitBar newOutstanding={p.newOutstanding} limit={p.customer.creditLimit} credit={p.credit} overBy={p.overBy} />
         )}
         {p && open && p.overpaidBy > 0 && (
-          <p className="mt-3 rounded-lg bg-amber px-3 py-2 font-semibold text-ink">{r(p.overpaidBy)} zyada mila. Wapas dena hai ya advance?</p>
+          <p className="mt-3 rounded-lg bg-amber px-3 py-2 font-semibold text-ink">{r(p.overpaidBy)} more than the bill. Give it back or keep it as advance?</p>
         )}
-        {draft.state === "CANCELLED" && <p className="mt-3 font-semibold">Bill radd hua. Kuch save nahi hua.</p>}
+        {draft.state === "CANCELLED" && <p className="mt-3 font-semibold">Bill cancelled. Nothing was saved.</p>}
         {open && (draft.items.length > 0 || draft.customer) && (
           <button onClick={onCancel} disabled={blocked} className="mt-2 h-11 rounded-lg font-medium text-muted outline-coconut hover:text-ink focus-visible:outline-2 disabled:opacity-40">
-            Bill cancel karo
+            Cancel bill
           </button>
         )}
       </div>
       {draft.state === "SAVED" && (
         <p
-          lang="hi"
           className="stamp pointer-events-none absolute left-1/2 top-[40%] -translate-x-1/2 rounded-lg border-4 border-double border-coconut px-5 py-1 text-5xl font-bold text-coconut opacity-90 mix-blend-multiply"
         >
-          बिल कटा
+          Saved
         </p>
       )}
     </section>

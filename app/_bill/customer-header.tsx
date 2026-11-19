@@ -31,7 +31,7 @@ export function CustomerHeader({ customer, account, note, locked, onChange }: Pr
         className="customer-picker"
       >
         <Icon name="person" className="size-5 text-coconut" />
-        Customer chuno <Icon name="chevron" className="ml-auto size-4" />
+        Choose customer <Icon name="chevron" className="ml-auto size-4" />
       </button>
     );
   }
@@ -41,15 +41,15 @@ export function CustomerHeader({ customer, account, note, locked, onChange }: Pr
         <h3 className="min-w-0 wrap-anywhere text-2xl font-semibold leading-tight">{customer.name}</h3>
         {!locked && (
           <button onClick={onChange} className="h-11 shrink-0 rounded-lg px-3 font-medium text-coconut outline-coconut hover:bg-paper focus-visible:outline-2">
-            Badlo
+            Change
           </button>
         )}
       </div>
       {note && <p className="text-sm text-muted">{note}</p>}
       <dl className="mt-3 grid grid-cols-3 gap-3">
-        <Stat label="Udhaar" value={account ? r(account.outstanding) : "…"} />
+        <Stat label="Credit" value={account ? r(account.outstanding) : "…"} />
         <Stat label="Limit" value={account ? r(account.creditLimit) : "…"} />
-        <Stat label="Baaki" value={account ? r(Math.max(0, account.creditLimit - account.outstanding)) : "…"} />
+        <Stat label="Left" value={account ? r(Math.max(0, account.creditLimit - account.outstanding)) : "…"} />
       </dl>
     </div>
   );

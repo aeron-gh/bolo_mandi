@@ -68,11 +68,11 @@ export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props)
         <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-2xl bg-canvas outline-none">
           <div aria-hidden className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-line" />
           <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
-            <Drawer.Title className="text-xl font-semibold">Customer chuno</Drawer.Title>
-            <Drawer.Description className="text-muted">Naam likho, jaise Afzal ya Manat.</Drawer.Description>
+            <Drawer.Title className="text-xl font-semibold">Choose customer</Drawer.Title>
+            <Drawer.Description className="text-muted">Type a name, like Afzal or Manat.</Drawer.Description>
 
             <form onSubmit={search} className="mt-4 flex gap-2">
-              <label htmlFor="customer-search" className="sr-only">Customer ka naam</label>
+              <label htmlFor="customer-search" className="sr-only">Customer name</label>
               <input
                 id="customer-search"
                 value={text}
@@ -87,7 +87,7 @@ export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props)
                 disabled={busy || !text.trim()}
                 className="h-14 rounded-xl bg-ink px-5 text-lg font-semibold text-white outline-coconut outline-offset-2 focus-visible:outline-3 disabled:opacity-40"
               >
-                Dhundo
+                Search
               </button>
             </form>
 
@@ -95,7 +95,7 @@ export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props)
 
             {match?.kind === "ambiguous" && (
               <div className="mt-5">
-                <p className="text-lg font-semibold">Kaun sa {asked}?</p>
+                <p className="text-lg font-semibold">Which {asked}?</p>
                 <ul className="mt-3 space-y-2">
                   {match.options.map((c) => (
                     <li key={c.id}>
@@ -108,19 +108,19 @@ export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props)
 
             {match?.kind === "not_found" && (
               <div className="mt-5">
-                <p className="text-lg font-semibold">&ldquo;{asked}&rdquo; list mein nahi hai. Naya customer hai?</p>
+                <p className="text-lg font-semibold">&ldquo;{asked}&rdquo; is not in your list. Is this a new customer?</p>
                 <button
                   onClick={addNew}
                   disabled={busy}
                   className="mt-3 h-16 w-full rounded-xl bg-coconut text-xl font-semibold text-white outline-coconut outline-offset-2 hover:bg-coconut-deep focus-visible:outline-3"
                 >
-                  Haan, {asked} ko add karo
+                  Yes, add {asked}
                 </button>
-                <p className="mt-2 text-sm text-muted">Naye customer ki limit ₹0 se shuru hoti hai.</p>
+                <p className="mt-2 text-sm text-muted">A new customer starts with a ₹0 credit limit.</p>
               </div>
             )}
 
-            {match?.kind === "unclear" && <p className="mt-5 text-lg font-semibold">Naam samajh nahi aaya. Phir se likho.</p>}
+            {match?.kind === "unclear" && <p className="mt-5 text-lg font-semibold">Couldn't read that name. Please type it again.</p>}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

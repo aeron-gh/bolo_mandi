@@ -33,13 +33,13 @@ export const recordVaada = (body: { draftId: string; customerId: number; amount:
 export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, customerId: number | null, followUp: FollowUp | null, accountQuestion: boolean, signal: AbortSignal) =>
   call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, customerId, needsCustomer: customerId === null, followUp, accountQuestion }, signal));
 
-// Server messages are for developers; the trader gets a plain Hinglish line.
+// Server messages are for developers; the trader gets a plain English line.
 const FRIENDLY: [RegExp, string][] = [
-  [/bad qty/, "Har line mein kitne piece, woh likho."],
-  [/bad rate/, "Rate sahi likho."],
-  [/already exists/, "Is naam ka customer pehle se hai."],
-  [/login_required/, "Login khatam ho gaya. Dobara login karo."],
-  [/failed to fetch|networkerror/i, "Server se baat nahi ho pa rahi. App chal raha hai, check karo."],
+  [/bad qty/, "Enter how many pieces for each line."],
+  [/bad rate/, "Please enter a valid rate."],
+  [/already exists/, "A customer with this name already exists."],
+  [/login_required/, "Your login has ended. Please log in again."],
+  [/failed to fetch|networkerror/i, "Can't reach the server. Check that Bolo is running, then try again."],
 ];
 
 export function friendlyError(error: unknown): string {

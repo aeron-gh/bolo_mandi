@@ -22,12 +22,12 @@ export function Dock({ busy, micDisabled, onType, onLikho }: Props) {
     <footer className="composer-wrap">
       <form onSubmit={submit} className="composer">
         <button type="button" onClick={onLikho} disabled={busy} className="manual-entry">
-          <KeyboardIcon className="size-5" /> Likho
+          <KeyboardIcon className="size-5" /> Add items
         </button>
-        <label htmlFor="bolo-command" className="sr-only">Bill ya sawaal likho</label>
+        <label htmlFor="bolo-command" className="sr-only">Type a bill or a question</label>
         <input id="bolo-command" value={input} onChange={(event) => setInput(event.target.value)} maxLength={500}
-          disabled={micDisabled || busy} autoComplete="off" placeholder="Bill ya sawaal likho…" />
-        <button type="submit" aria-label="Bhejo" title="Bhejo" disabled={micDisabled || busy || !input.trim()} className="send-button">
+          disabled={micDisabled || busy} autoComplete="off" placeholder="Type a bill or a question…" />
+        <button type="submit" aria-label="Send" title="Send" disabled={micDisabled || busy || !input.trim()} className="send-button">
           <Icon name="send" />
         </button>
       </form>

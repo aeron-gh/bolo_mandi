@@ -1,5 +1,5 @@
 "use client";
-// The kaccha bill, editable in place: lines, a new line, payment with quick buttons, and the limit bar.
+// The draft bill, editable in place: lines, a new line, payment with quick buttons, and the limit bar.
 import { useState } from "react";
 import type { CreditStatus, Grade, ItemInput, Unit } from "@/lib/billing.ts";
 import { limitShare, paymentFor, type QuickPayment } from "@/lib/draft.ts";
@@ -29,23 +29,23 @@ export function LineEditor({ index, item, listRate, amount, locked, lit, update,
       </div>
       <div className="edit-line-row">
         <div className="stepper">
-          <button type="button" aria-label={`Line ${n}, ek kam`} disabled={locked || item.qty <= 1}
+          <button type="button" aria-label={`Line ${n}, one less`} disabled={locked || item.qty <= 1}
             onClick={() => update({ qty: Math.max(1, item.qty - 1) })}>−</button>
-          <input aria-label={`Line ${n}, kitne`} inputMode="numeric" value={item.qty ? String(item.qty) : ""} disabled={locked}
+          <input aria-label={`Line ${n}, quantity`} inputMode="numeric" value={item.qty ? String(item.qty) : ""} disabled={locked}
             onChange={(e) => update({ qty: wholeNumber(e.target.value) ?? 0 })} />
-          <button type="button" aria-label={`Line ${n}, ek zyada`} disabled={locked}
+          <button type="button" aria-label={`Line ${n}, one more`} disabled={locked}
             onClick={() => update({ qty: item.qty + 1 })}>+</button>
         </div>
-        <button type="button" className="unit-toggle" disabled={locked} aria-label={`Line ${n}, ${item.unit === "crate" ? "crate" : "piece"}; badalne ke liye dabaiye`}
+        <button type="button" className="unit-toggle" disabled={locked} aria-label={`Line ${n}, ${item.unit === "crate" ? "crate" : "piece"}; press to change`}
           onClick={() => update({ unit: item.unit === "crate" ? "piece" : "crate" })}>{item.unit === "crate" ? "crate" : "piece"}</button>
         <RateField n={n} rate={item.rate} listRate={listRate} locked={locked} update={update} />
-        <button type="button" className="line-remove" disabled={locked} onClick={remove} aria-label={`Line ${n} hatao`}>Hatao</button>
+        <button type="button" className="line-remove" disabled={locked} onClick={remove} aria-label={`Remove line ${n}`}>Remove</button>
       </div>
     </li>
   );
 }
 
-// Empty means the price list; a typed rate is marked "badla" and can go back to the list in one tap.
+// Empty means the price list; a typed rate is marked "changed" and can go back to the list in one tap.
 function RateField({ n, rate, listRate, locked, update }: { n: number; rate: number | undefined; listRate: number; locked: boolean; update: LineProps["update"] }) {
   return (
     <span className="rate-field">
@@ -59,13 +59,13 @@ function RateField({ n, rate, listRate, locked, update }: { n: number; rate: num
         }} />
       {rate !== undefined && rate !== listRate && (
         <button type="button" className="rate-badla" disabled={locked} onClick={() => update({ rate: undefined })}
-          title={`List rate ${r(listRate)} wapas lagao`}>badla</button>
+          title={`Use the list rate ${r(listRate)} again`}>changed</button>
       )}
     </span>
   );
 }
 
-// "Kitne" then a grade button adds the line. Likho focuses this box.
+// A quantity then a grade button adds the line. "Add items" focuses this box.
 export function AddLine({ locked, add }: { locked: boolean; add: (item: ItemInput) => void }) {
   const [qty, setQty] = useState("");
   const [unit, setUnit] = useState<Unit>("piece");
@@ -74,7 +74,7 @@ export function AddLine({ locked, add }: { locked: boolean; add: (item: ItemInpu
   function addGrade(grade: Grade) {
     const n = wholeNumber(qty);
     if (!n) {
-      setHint("Pehle likhiye kitne piece ya crate.");
+      setHint("First enter how many pieces or crates.");
       document.getElementById("add-qty")?.focus();
       return;
     }
@@ -86,11 +86,11 @@ export function AddLine({ locked, add }: { locked: boolean; add: (item: ItemInpu
   return (
     <div className="add-line">
       <div className="add-line-row">
-        <label className="sr-only" htmlFor="add-qty">Naya maal, kitne</label>
-        <input id="add-qty" className="add-qty" inputMode="numeric" placeholder="Kitne" value={qty} disabled={locked}
+        <label className="sr-only" htmlFor="add-qty">New item quantity</label>
+        <input id="add-qty" className="add-qty" inputMode="numeric" placeholder="Qty" value={qty} disabled={locked}
           onChange={(e) => setQty(e.target.value)} />
         <button type="button" className="unit-toggle" disabled={locked} onClick={() => setUnit(unit === "crate" ? "piece" : "crate")}
-          aria-label={`Naya maal ${unit}; badalne ke liye dabaiye`}>{unit}</button>
+          aria-label={`New item, ${unit}; press to change`}>{unit}</button>
         {GRADES.map((grade) => (
           <button key={grade} type="button" className="add-grade" disabled={locked} onClick={() => addGrade(grade)}>+ Grade {grade}</button>
         ))}
@@ -130,7 +130,7 @@ function MoneyBox({ label, value, locked, onChange }: { label: string; value: nu
   );
 }
 
-const QUICK: [QuickPayment, string][] = [["cash", "Poora cash"], ["half", "Aadha cash"], ["upi", "Poora UPI"], ["udhaar", "Sab udhaar"]];
+const QUICK: [QuickPayment, string][] = [["cash", "All cash"], ["half", "Half cash"], ["upi", "All UPI"], ["credit", "All on credit"]];
 
 // Cash and UPI, plus quick buttons that use the server's total, so the screen does no money maths.
 export function PaymentEditor({ cash, upi, total, locked, setPayment }: {
@@ -142,7 +142,7 @@ export function PaymentEditor({ cash, upi, total, locked, setPayment }: {
         <MoneyBox label="Cash" value={cash} locked={locked} onChange={(paise) => setPayment({ cash: paise })} />
         <MoneyBox label="UPI" value={upi} locked={locked} onChange={(paise) => setPayment({ upi: paise })} />
       </div>
-      <div className="quick-pay" role="group" aria-label="Jaldi payment">
+      <div className="quick-pay" role="group" aria-label="Quick payment">
         {QUICK.map(([choice, label]) => {
           const pay = total === null ? null : paymentFor(choice, total);
           return (
@@ -156,19 +156,19 @@ export function PaymentEditor({ cash, upi, total, locked, setPayment }: {
   );
 }
 
-const LIMIT_WORDS: Record<CreditStatus, string> = { ok: "Limit mein", near: "Limit ke paas", over: "Limit se upar" };
+const LIMIT_WORDS: Record<CreditStatus, string> = { ok: "Within limit", near: "Close to limit", over: "Over limit" };
 
 // How full the credit limit will be after this bill.
 export function LimitBar({ newOutstanding, limit, credit, overBy }: { newOutstanding: number; limit: number; credit: CreditStatus; overBy: number }) {
   const share = limitShare(newOutstanding, limit);
   return (
     <div className={`limit-bar credit-${credit}`}>
-      <div className="limit-track" role="img" aria-label={`Credit limit ka ${share}% bharega`}>
+      <div className="limit-track" role="img" aria-label={`${share}% of the credit limit used`}>
         <span style={{ width: `${share}%` }} />
       </div>
       <p>
         <strong>{LIMIT_WORDS[credit]}</strong>
-        {credit === "over" ? `, ${r(overBy)} upar` : `, ${share}% bharega`}
+        {credit === "over" ? `, ${r(overBy)} over` : `, ${share}% used`}
         <span className="limit-of"> Limit {r(limit)}</span>
       </p>
     </div>
