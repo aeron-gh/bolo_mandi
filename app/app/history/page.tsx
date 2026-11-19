@@ -7,12 +7,12 @@ import { currentShop } from "@/lib/server.ts";
 
 export const metadata: Metadata = { title: "History · Bolo" };
 
-// "Aaj" and "Kal" read better than dates for the last two days.
+// "Today" and "Yesterday" read better than dates for the last two days.
 function dayName(day: string, today: string): string {
   const yesterday = new Date(`${today}T00:00:00Z`);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  if (day === today) return `Aaj, ${indiaDayLabel(day)}`;
-  if (day === yesterday.toISOString().slice(0, 10)) return `Kal, ${indiaDayLabel(day)}`;
+  if (day === today) return `Today, ${indiaDayLabel(day)}`;
+  if (day === yesterday.toISOString().slice(0, 10)) return `Yesterday, ${indiaDayLabel(day)}`;
   return indiaDayLabel(day);
 }
 
@@ -39,45 +39,45 @@ export default async function HistoryPage({ searchParams }: PageProps<"/app/hist
     <main className="page">
       <header className="page-head">
         <h1>History</h1>
-        <p>Har kata hua bill, India ki taarikh ke hisaab se.</p>
+        <p>Every saved bill, grouped by the date in India.</p>
       </header>
 
-      <section className="today-strip" aria-label="Aaj ki sale">
-        <div><span>Aaj ki sale</span><strong>{formatRupees(todayTotals.total)}</strong></div>
-        <div><span>Bill</span><strong>{todayTotals.bills}</strong></div>
+      <section className="today-strip" aria-label="Today's sales">
+        <div><span>Today&apos;s sales</span><strong>{formatRupees(todayTotals.total)}</strong></div>
+        <div><span>Bills</span><strong>{todayTotals.bills}</strong></div>
         <div><span>Cash</span><strong>{formatRupees(todayTotals.cash)}</strong></div>
         <div><span>UPI</span><strong>{formatRupees(todayTotals.upi)}</strong></div>
-        <div><span>Udhaar</span><strong>{formatRupees(todayTotals.udhaar)}</strong></div>
+        <div><span>Credit</span><strong>{formatRupees(todayTotals.udhaar)}</strong></div>
       </section>
 
       <div className="list-tools">
         <form action="/app/history" className="day-form">
-          <label className="field">Taarikh chuno
+          <label className="field">Pick a date
             <input className="input" type="date" name="day" defaultValue={day} max={today} />
           </label>
           {customerId && <input type="hidden" name="customer" value={customerId} />}
-          <button className="btn btn-outline">Dikhao</button>
+          <button className="btn btn-outline">Show</button>
         </form>
         {(day || customerName) && (
           <p className="filter-note">
-            {customerName && <>Sirf <strong>{customerName}</strong> ke bills. </>}
-            {day && <>Sirf {indiaDayLabel(day)}. </>}
-            <Link href="/app/history" className="text-link">Sab bills dikhao</Link>
+            {customerName && <>Only <strong>{customerName}</strong>&apos;s bills. </>}
+            {day && <>Only {indiaDayLabel(day)}. </>}
+            <Link href="/app/history" className="text-link">Show all bills</Link>
           </p>
         )}
       </div>
 
       {bills.length === 0 ? (
         <div className="empty-state">
-          <h2>{day || customerName ? "Is filter mein koi bill nahi" : "Abhi koi bill nahi kata"}</h2>
-          <p>{day || customerName ? <Link href="/app/history" className="text-link">Sab bills dikhao</Link> : <>Pehla bill <Link href="/app" className="text-link">Bill</Link> tab se banaiye.</>}</p>
+          <h2>{day || customerName ? "No bills in this filter" : "No bills saved yet"}</h2>
+          <p>{day || customerName ? <Link href="/app/history" className="text-link">Show all bills</Link> : <>Make your first bill from the <Link href="/app" className="text-link">Bill</Link> tab.</>}</p>
         </div>
       ) : (
         groupByDay(bills).map(([groupDay, group]) => (
           <section key={groupDay} className="sheet" aria-label={dayName(groupDay, today)}>
             <header className="day-head">
               <h2>{dayName(groupDay, today)}</h2>
-              <p>{group.length} bill, {formatRupees(sum(group, "total"))}. Cash {formatRupees(sum(group, "cash"))}, UPI {formatRupees(sum(group, "upi"))}, udhaar {formatRupees(sum(group, "udhaar"))}.</p>
+              <p>{group.length} {group.length === 1 ? "bill" : "bills"}, {formatRupees(sum(group, "total"))}. Cash {formatRupees(sum(group, "cash"))}, UPI {formatRupees(sum(group, "upi"))}, credit {formatRupees(sum(group, "udhaar"))}.</p>
             </header>
             <ul className="sheet-list flat">
               {group.map((bill) => (
@@ -89,7 +89,7 @@ export default async function HistoryPage({ searchParams }: PageProps<"/app/hist
                     </span>
                     <span className="customer-money">
                       <strong>{formatRupees(bill.total)}</strong>
-                      {bill.udhaar > 0 && <small className="panel-note">{formatRupees(bill.udhaar)} udhaar</small>}
+                      {bill.udhaar > 0 && <small className="panel-note">{formatRupees(bill.udhaar)} on credit</small>}
                     </span>
                   </Link>
                 </li>

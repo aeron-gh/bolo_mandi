@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: "Login · Bolo" };
 export const instant = false;
 
 const ERRORS: Record<string, string> = {
-  google: "Google login nahi hua. Dobara try karein.",
-  google_off: "Google login abhi chalu nahi hai. Email se login karein.",
+  google: "Google sign-in didn't work. Please try again.",
+  google_off: "Google sign-in is not set up yet. Please log in with email.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -21,11 +21,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
   return (
     <AuthCard
-      title="Apni dukaan kholiye"
-      lead={shop?.mode === "demo" ? "Abhi demo chal raha hai. Apne account se login karein." : "Bill, khata aur hisaab, sab ek jagah."}
+      title="Open your shop"
+      lead={shop?.mode === "demo" ? "You are in the demo shop. Log in to your own account." : "Bills, ledger and accounts in one place."}
       google={googleConfig(process.env) !== null}
       error={typeof error === "string" ? ERRORS[error] : undefined}
-      footer={<>Naya account? <Link href="/signup">Account banao</Link></>}
+      footer={<>New here? <Link href="/signup">Create an account</Link></>}
     >
       <AuthForm mode="login" />
     </AuthCard>

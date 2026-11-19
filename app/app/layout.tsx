@@ -8,7 +8,7 @@ export const instant = false;
 export default async function AppLayout({ children }: LayoutProps<"/app">) {
   const { db, mode, user } = await currentShop();
   const shop = getShop(db);
-  const title = mode === "demo" ? "Demo dukaan" : shop.shopName || "Meri dukaan";
+  const title = mode === "demo" ? "Demo shop" : shop.shopName || "My shop";
   const subtitle = mode === "demo" ? "Sample customers" : shop.ownerName || user?.name || "";
   return <AppShell title={title} subtitle={subtitle} demo={mode === "demo"}>{children}</AppShell>;
 }

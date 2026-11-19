@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const file = path.join(tmpdir(), `bolo-${randomBytes(8).toString("hex")}.db`);
   try {
     const shop = shopFor(req);
-    if (shop.mode === "demo") throw new Error("Demo dukaan ka backup nahi banta. Apna account banaiye.");
+    if (shop.mode === "demo") throw new Error("The demo shop has no backups. Create your own account.");
     assertOwner(shop.db, ownerToken(req), new Date());
     await backupTo(shop.db, file);
     return new Response(readFileSync(file), {

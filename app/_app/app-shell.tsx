@@ -23,9 +23,9 @@ export function AppShell({ title, subtitle, demo, children }: Props) {
         <nav className="shell-nav" aria-label="App"><NavLinks /></nav>
         {demo && (
           <div className="demo-card">
-            <strong>Demo dukaan</strong>
-            <p>Sab ke liye ek. Data kabhi bhi reset ho sakta hai.</p>
-            <Link href="/signup" className="btn btn-primary btn-sm">Apna account banao</Link>
+            <strong>Demo shop</strong>
+            <p>Shared by everyone. Data can be reset at any time.</p>
+            <Link href="/signup" className="btn btn-primary btn-sm">Create your account</Link>
           </div>
         )}
         <Link href="/app/profile" className="shell-owner">

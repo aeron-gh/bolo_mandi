@@ -6,7 +6,7 @@ import { Icon } from "@/app/_bill/icons.tsx";
 
 const TABS = [
   { href: "/app", label: "Bill", icon: "receipt" },
-  { href: "/app/customers", label: "Khata", icon: "book" },
+  { href: "/app/customers", label: "Ledger", icon: "book" },
   { href: "/app/history", label: "History", icon: "clock" },
   { href: "/app/profile", label: "Profile", icon: "person" },
 ] as const;

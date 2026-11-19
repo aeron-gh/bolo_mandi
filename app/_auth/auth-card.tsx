@@ -30,14 +30,14 @@ export function AuthCard({ title, lead, google, error, children, footer }: Props
         {error && <p className="form-error" role="alert">{error}</p>}
         {google && (
           <a className="btn btn-outline btn-block" href="/api/auth/google/start">
-            <GoogleMark /> Google se aage badhein
+            <GoogleMark /> Continue with Google
           </a>
         )}
-        {google && <p className="auth-or">ya email se</p>}
+        {google && <p className="auth-or">or with email</p>}
         {children}
-        <p className="auth-or">ya</p>
+        <p className="auth-or">or</p>
         <DemoButton />
-        <p className="auth-note">Demo dukaan sabke liye ek hai, sample customers ke saath. Apna asli hisaab account mein rakhein.</p>
+        <p className="auth-note">The demo shop is shared by everyone and has sample customers. Keep your real accounts in your own account.</p>
         <p className="auth-switch">{footer}</p>
       </div>
     </main>

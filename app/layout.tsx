@@ -9,7 +9,7 @@ const hindi = Noto_Sans_Devanagari({ variable: "--font-hindi", subsets: ["devana
 
 export const metadata: Metadata = {
   title: { default: "Bolo · MandiPlus", template: "%s · MandiPlus" },
-  description: "Bolo: bolke bill banao. Voice billing for the mandi counter.",
+  description: "Bolo: make bills by speaking. Voice billing for the mandi counter.",
 };
 
 export const viewport: Viewport = { themeColor: "#f5f6fb" };

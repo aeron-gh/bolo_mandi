@@ -5,7 +5,7 @@ import { changePin } from "@/lib/shop-api.ts";
 export async function POST(req: Request) {
   return reply(async () => {
     const shop = shopFor(req);
-    if (shop.mode === "demo") throw new Error("Demo dukaan mein PIN nahi lagta. Apna account banaiye.");
+    if (shop.mode === "demo") throw new Error("The demo shop has no PIN. Create your own account to set one.");
     return changePin(shop.db, ownerToken(req), new Date(), await req.json());
   });
 }

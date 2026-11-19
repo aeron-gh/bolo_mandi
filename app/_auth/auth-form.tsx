@@ -8,10 +8,10 @@ type Mode = "login" | "signup";
 // POST the form as JSON; null means it worked, otherwise the message to show.
 async function send(url: string, body: unknown): Promise<string | null> {
   const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
-  if (!res) return "Internet nahi hai. Dobara try karein.";
+  if (!res) return "No internet. Please try again.";
   if (res.ok) return null;
   const data = (await res.json().catch(() => null)) as { error?: string } | null;
-  return data?.error ?? "Kuch gadbad hui. Dobara try karein.";
+  return data?.error ?? "Something went wrong. Please try again.";
 }
 
 export function AuthForm({ mode }: { mode: Mode }) {
@@ -33,8 +33,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
     <form className="auth-form" onSubmit={submit}>
       {mode === "signup" && (
         <>
-          <label className="field">Aapka naam<input className="input" name="name" autoComplete="name" required maxLength={60} /></label>
-          <label className="field">Dukaan ka naam<input className="input" name="shopName" autoComplete="organization" maxLength={60} /></label>
+          <label className="field">Your name<input className="input" name="name" autoComplete="name" required maxLength={60} /></label>
+          <label className="field">Shop name<input className="input" name="shopName" autoComplete="organization" maxLength={60} /></label>
         </>
       )}
       <label className="field">Email<input className="input" name="email" type="email" autoComplete="email" required maxLength={120} /></label>
@@ -42,11 +42,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         Password
         <input className="input" name="password" type="password" required minLength={mode === "signup" ? 8 : undefined}
           autoComplete={mode === "signup" ? "new-password" : "current-password"} />
-        {mode === "signup" && <span className="field-hint">Kam se kam 8 akshar</span>}
+        {mode === "signup" && <span className="field-hint">At least 8 characters</span>}
       </label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="btn btn-primary btn-block" disabled={busy}>
-        {busy ? "Ruko…" : mode === "login" ? "Login" : "Account banao"}
+        {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
       </button>
     </form>
   );
@@ -69,7 +69,7 @@ export function DemoButton() {
   return (
     <>
       <button type="button" className="btn btn-soft btn-block" onClick={start} disabled={busy}>
-        {busy ? "Ruko…" : "Bina login demo dekhein"}
+        {busy ? "Please wait…" : "Try the demo without logging in"}
       </button>
       {error && <p className="form-error" role="alert">{error}</p>}
     </>

@@ -43,7 +43,7 @@ export function useDraftId() {
   };
 }
 
-// A modal box for one form. Esc and "Band karo" close it.
+// A modal box for one form. Esc and "Close" close it.
 export function FormDialog({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const box = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -56,7 +56,7 @@ export function FormDialog({ open, title, onClose, children }: { open: boolean; 
       <div className="dialog-body">
         <div className="dialog-title">
           <h2>{title}</h2>
-          <button type="button" className="text-link" onClick={onClose}>Band karo</button>
+          <button type="button" className="text-link" onClick={onClose}>Close</button>
         </div>
         {children}
       </div>

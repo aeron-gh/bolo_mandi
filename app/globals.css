@@ -443,7 +443,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible {
   .ledger tr:last-child { border-bottom: 0; }
   .ledger td { padding: 0; border: 0; }
   .ledger .when { grid-column: 1 / -1; font-size: 13px; }
-  .ledger td:nth-child(4)::before { content: "Udhaar "; color: var(--muted); font-size: 13px; }
+  .ledger td:nth-child(4)::before { content: "Credit "; color: var(--muted); font-size: 13px; }
   .khata-figures { gap: 18px; }
   .customer-row, .promise-row, .sheet-title { padding-inline: 16px; }
   .chip-sort { margin-left: 0; }

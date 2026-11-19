@@ -36,7 +36,7 @@ export function ProfileForms({ shop, rates, demo, user, draftKey }: Props) {
     <main className="page page-narrow">
       <header className="page-head">
         <h1>Profile</h1>
-        <p>Dukaan ki jaankari, rate list aur PIN.</p>
+        <p>Shop details, rate list and owner PIN.</p>
       </header>
       <div className="settings">
         <ShopPanel shop={shop} run={owner.run} />
@@ -66,17 +66,17 @@ function AccountPanel({ demo, user, draftKey }: { demo: boolean; user: User | nu
   }
 
   return (
-    <SettingRow title="Account" note={demo ? "Yeh demo dukaan sab ke liye ek hai. Asli hisaab apne account mein rakhein." : "Is device se login."}>
+    <SettingRow title="Account" note={demo ? "This demo shop is shared by everyone. Keep your real accounts in your own account." : "Signed in on this device."}>
       {demo ? (
         <>
           <div className="btn-row">
-            <Link href="/signup" className="btn btn-primary">Account banao</Link>
+            <Link href="/signup" className="btn btn-primary">Create account</Link>
             <Link href="/login" className="btn btn-outline">Login</Link>
           </div>
           <button type="button" className="btn btn-soft justify-self-start" onClick={() => void act("/api/demo/reset", () => {
-            setStatus({ ok: true, text: "Demo reset ho gayi." });
+            setStatus({ ok: true, text: "Demo shop reset." });
             router.refresh();
-          })}>Demo reset karo</button>
+          })}>Reset demo shop</button>
         </>
       ) : (
         <>
@@ -86,7 +86,7 @@ function AccountPanel({ demo, user, draftKey }: { demo: boolean; user: User | nu
           </button>
         </>
       )}
-      <Link href="/help" className="text-link">Bolo kya kya samajhta hai</Link>
+      <Link href="/help" className="text-link">What Bolo understands</Link>
       <StatusLine value={status} />
     </SettingRow>
   );
@@ -97,17 +97,17 @@ function ShopPanel({ shop, run }: { shop: Shop; run: Run }) {
   const { onSubmit, status, busy } = useSubmit(async (fields) => {
     await run(() => ownerFetch("/api/shop", "PUT", fields));
     router.refresh();
-    return "Dukaan save ho gayi.";
+    return "Shop details saved.";
   });
   return (
-    <SettingRow title="Dukaan" note="Bill aur WhatsApp parchi par yahi naam, number aur pata chhapega.">
+    <SettingRow title="Shop" note="This name, number and address are printed on bills and WhatsApp receipts.">
       <form className="form-stack" onSubmit={onSubmit}>
-        <label className="field">Dukaan ka naam<input className="input" name="shopName" defaultValue={shop.shopName} maxLength={60} /></label>
-        <label className="field">Owner ka naam<input className="input" name="ownerName" defaultValue={shop.ownerName} maxLength={60} /></label>
+        <label className="field">Shop name<input className="input" name="shopName" defaultValue={shop.shopName} maxLength={60} /></label>
+        <label className="field">Owner name<input className="input" name="ownerName" defaultValue={shop.ownerName} maxLength={60} /></label>
         <label className="field">Mobile<input className="input" name="phone" type="tel" inputMode="tel" defaultValue={shop.phone} placeholder="98765 43210" /></label>
-        <label className="field">Pata<textarea className="input textarea" name="address" defaultValue={shop.address} maxLength={160} rows={2} /></label>
+        <label className="field">Address<textarea className="input textarea" name="address" defaultValue={shop.address} maxLength={160} rows={2} /></label>
         <StatusLine value={status} />
-        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Ruko…" : "Dukaan save karo"}</button>
+        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Saving…" : "Save shop details"}</button>
       </form>
     </SettingRow>
   );
@@ -119,15 +119,15 @@ function RatesPanel({ rates, run }: { rates: RateCard; run: Run }) {
     const paise = {} as RateCard;
     for (const grade of GRADES) {
       const text = (fields[`grade${grade}`] ?? "").trim();
-      if (!/^\d+$/.test(text)) throw new Error(`Grade ${grade} ka rate poore rupaye mein likho.`);
+      if (!/^\d+$/.test(text)) throw new Error(`Enter the grade ${grade} rate in whole rupees.`);
       paise[grade] = rs(Number(text));
     }
     await run(() => ownerFetch("/api/rates", "PUT", paise));
     router.refresh();
-    return "Rate save ho gaye. Agle bill se lagenge.";
+    return "Rates saved. They apply from the next bill.";
   });
   return (
-    <SettingRow title="Rate list" note="Ek piece ka rate, poore rupaye mein. Bill banate waqt bola gaya rate isse upar rehta hai.">
+    <SettingRow title="Rate list" note="Price per piece, in whole rupees. A rate spoken while billing takes priority.">
       <form className="form-stack" onSubmit={onSubmit}>
         <div className="form-row">
           {GRADES.map((grade) => (
@@ -137,7 +137,7 @@ function RatesPanel({ rates, run }: { rates: RateCard; run: Run }) {
           ))}
         </div>
         <StatusLine value={status} />
-        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Ruko…" : "Rate save karo"}</button>
+        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Saving…" : "Save rates"}</button>
       </form>
     </SettingRow>
   );
@@ -146,19 +146,19 @@ function RatesPanel({ rates, run }: { rates: RateCard; run: Run }) {
 function PinPanel({ demo, hasPin, run }: { demo: boolean; hasPin: boolean; run: Run }) {
   const router = useRouter();
   const { onSubmit, status, busy } = useSubmit(async (fields, form) => {
-    if (fields.pin !== fields.repeat) throw new Error("Dono PIN ek jaise nahi hain.");
+    if (fields.pin !== fields.repeat) throw new Error("The two PINs do not match.");
     const body = hasPin ? { pin: fields.pin, currentPin: fields.currentPin } : { pin: fields.pin };
     await run(() => ownerFetch("/api/pin", "POST", body));
     form.reset();
     router.refresh();
-    return hasPin ? "PIN badal gaya." : "PIN lag gaya. Ab dukaan, rate aur limit badalne se pehle PIN poocha jayega.";
+    return hasPin ? "PIN changed." : "PIN set. Bolo will now ask for it before shop, rate or limit changes.";
   });
   const [lockNote, setLockNote] = useState<Status>(null);
 
   if (demo) {
     return (
-      <SettingRow title="Owner PIN" note="Demo dukaan sab use karte hain, isliye yahan PIN nahi lagta.">
-        <p className="panel-note">Apne account mein PIN lagakar rate, dukaan aur limit ko surakshit rakhiye.</p>
+      <SettingRow title="Owner PIN" note="Everyone uses the demo shop, so it has no PIN.">
+        <p className="panel-note">In your own account, a PIN protects your rates, shop details and limits.</p>
       </SettingRow>
     );
   }
@@ -171,26 +171,26 @@ function PinPanel({ demo, hasPin, run }: { demo: boolean; hasPin: boolean; run: 
   );
 
   return (
-    <SettingRow title="Owner PIN" note={hasPin ? "Dukaan, rate, limit aur backup badalne se pehle PIN poocha jata hai."
-      : "Abhi PIN nahi hai, isliye counter par koi bhi rate badal sakta hai. 4 se 6 ank ka PIN lagaiye."}>
+    <SettingRow title="Owner PIN" note={hasPin ? "Bolo asks for the PIN before changes to shop details, rates, limits and backups."
+      : "No PIN yet, so anyone at the counter can change your rates. Set a 4 to 6 digit PIN."}>
       <form className="form-stack" onSubmit={onSubmit}>
-        {hasPin && pinInput("currentPin", "Abhi ka PIN")}
+        {hasPin && pinInput("currentPin", "Current PIN")}
         <div className="form-row form-row-2">
-          {pinInput("pin", hasPin ? "Naya PIN" : "PIN")}
-          {pinInput("repeat", "Dobara likho")}
+          {pinInput("pin", hasPin ? "New PIN" : "PIN")}
+          {pinInput("repeat", "Repeat PIN")}
         </div>
         <StatusLine value={status} />
-        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Ruko…" : hasPin ? "PIN badlo" : "PIN lagao"}</button>
+        <button className="btn btn-primary justify-self-start" disabled={busy}>{busy ? "Saving…" : hasPin ? "Change PIN" : "Set PIN"}</button>
       </form>
       {hasPin && (
         <button type="button" className="btn btn-outline justify-self-start" onClick={async () => {
           try {
             await ownerFetch("/api/session", "DELETE");
-            setLockNote({ ok: true, text: "Lock ho gaya. Agla badlav PIN maangega." });
+            setLockNote({ ok: true, text: "Locked. The next change will ask for the PIN." });
           } catch (error) {
             setLockNote({ ok: false, text: messageOf(error) });
           }
-        }}><Icon name="lock" /> Abhi lock karo</button>
+        }}><Icon name="lock" /> Lock now</button>
       )}
       <StatusLine value={lockNote} />
     </SettingRow>
@@ -211,14 +211,14 @@ function BackupPanel({ run }: { run: Run }) {
         if (res.ok) return res.blob();
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (res.status === 401 && data.error === "pin_required") throw new PinNeeded();
-        throw new Error(data.error ?? "Backup nahi bana. Dobara try karein.");
+        throw new Error(data.error ?? "Backup failed. Please try again.");
       });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(file);
       link.download = `bolo-backup-${new Date().toISOString().slice(0, 10)}.db`;
       link.click();
       URL.revokeObjectURL(link.href);
-      setStatus({ ok: true, text: "Backup download ho gaya. Ise pen drive ya Google Drive mein rakh lijiye." });
+      setStatus({ ok: true, text: "Backup downloaded. Keep it on a pen drive or in Google Drive." });
     } catch (error) {
       setStatus({ ok: false, text: messageOf(error) });
     } finally {
@@ -227,9 +227,9 @@ function BackupPanel({ run }: { run: Run }) {
   }
 
   return (
-    <SettingRow title="Backup" note="Har din ek backup apne aap banta hai, aakhri 14 din ke rakhe jaate hain. Kabhi bhi poori dukaan ki copy le sakte hain.">
+    <SettingRow title="Backup" note="A backup is made automatically every day and the last 14 are kept. You can download a full copy of your shop any time.">
       <button type="button" className="btn btn-outline justify-self-start" onClick={() => void download()} disabled={busy}>
-        {busy ? "Ruko…" : "Backup download karo"}
+        {busy ? "Preparing…" : "Download backup"}
       </button>
       <StatusLine value={status} />
     </SettingRow>
