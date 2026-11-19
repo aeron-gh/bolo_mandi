@@ -1,5 +1,6 @@
 // SQLite setup using Node's built-in node:sqlite. Money columns are paise.
 import { DatabaseSync } from "node:sqlite";
+import path from "node:path";
 import seedJson from "../data/seed.json" with { type: "json" };
 import { rs } from "./money.ts";
 import type { Grade, RateCard } from "./billing.ts";
@@ -65,6 +66,9 @@ CREATE TABLE IF NOT EXISTS promises (
   created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 ) STRICT;
 `;
+
+// The real database file. Tests use ":memory:" instead.
+export const DB_FILE = path.join(process.cwd(), "data", "bolo.db");
 
 // Open (or create) the database and make sure the tables exist.
 export function openDb(file: string): DatabaseSync {
