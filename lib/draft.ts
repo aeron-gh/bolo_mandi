@@ -26,7 +26,8 @@ export type Action =
   | { type: "readBack"; draftId: string }
   | { type: "reviewAgain" }
   | { type: "saved"; billId: number }
-  | { type: "cancel" };
+  | { type: "cancel" }
+  | { type: "revert"; to: BillDraft };
 
 // Random id from getRandomValues; randomUUID fails on plain http over Wi-Fi.
 // Call it in a click handler, never while rendering.
@@ -78,6 +79,9 @@ export function billReducer(draft: BillDraft, action: Action): BillDraft {
       return draft.state === "AWAITING_CONFIRM" ? { ...draft, state: "SAVED", billId: action.billId } : draft;
     case "cancel":
       return { ...draft, state: "CANCELLED" };
+    case "revert":
+      // Undo is an edit too: the bill goes back to kaccha and must be read back again.
+      return edit(draft, { customer: action.to.customer, items: action.to.items, cash: action.to.cash, upi: action.to.upi });
   }
 }
 
@@ -127,4 +131,29 @@ export function startDraft(saved: unknown, customer: Customer | null): { draft: 
 export function openEntries(draft: BillDraft): { items: ItemInput[]; cash: number; upi: number } {
   if (draft.state === "SAVED" || draft.state === "CANCELLED") return { items: [], cash: 0, upi: 0 };
   return { items: draft.items, cash: draft.cash, upi: draft.upi };
+}
+
+export type QuickPayment = "cash" | "half" | "upi" | "udhaar";
+
+// The quick payment buttons. "Aadha cash" is half the total rounded down to the paisa.
+export function paymentFor(choice: QuickPayment, total: number): { cash: number; upi: number } {
+  if (choice === "cash") return { cash: total, upi: 0 };
+  if (choice === "half") return { cash: Math.floor(total / 2), upi: 0 };
+  if (choice === "upi") return { cash: 0, upi: total };
+  return { cash: 0, upi: 0 };
+}
+
+const sameLine = (a: ItemInput | undefined, b: ItemInput) =>
+  a !== undefined && a.grade === b.grade && a.qty === b.qty && a.rate === b.rate && (a.unit ?? "piece") === (b.unit ?? "piece");
+
+// Positions of lines that are new or different after a change, so the screen can point at them.
+export function changedLines(before: ItemInput[], after: ItemInput[]): number[] {
+  return after.flatMap((line, i) => (sameLine(before[i], line) ? [] : [i]));
+}
+
+// How full the credit limit is, as a whole percent from 0 to 100. A ₹0 limit is full once anything is owed.
+export function limitShare(newOutstanding: number, limit: number): number {
+  if (newOutstanding <= 0) return 0;
+  if (limit <= 0) return 100;
+  return Math.min(100, Math.floor((newOutstanding * 100) / limit));
 }

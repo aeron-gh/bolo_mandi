@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rs } from "../lib/money.ts";
-import { newDraft, newDraftId, billReducer, openEntries, restoreDraft, startDraft, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
+import { newDraft, newDraftId, billReducer, changedLines, limitShare, openEntries, paymentFor, restoreDraft, startDraft, whatIsMissing, type BillDraft, type Action } from "../lib/draft.ts";
 import { readBackText, type ReadBackInput } from "../lib/readback.ts";
 
 const MANAT = { id: 1, name: "Manat" };
@@ -229,5 +229,54 @@ describe("openEntries (what voice treats as the bill in progress)", () => {
     for (const state of ["SAVED", "CANCELLED"] as const) {
       expect(openEntries({ ...lines, state })).toEqual({ items: [], cash: 0, upi: 0 });
     }
+  });
+});
+
+describe("paymentFor (quick payment buttons)", () => {
+  it("fills cash or UPI from the bill total; aadha cash rounds down to the paisa", () => {
+    expect(paymentFor("cash", rs(12000))).toEqual({ cash: rs(12000), upi: 0 });
+    expect(paymentFor("upi", rs(12000))).toEqual({ cash: 0, upi: rs(12000) });
+    expect(paymentFor("half", 1_200_001)).toEqual({ cash: 600_000, upi: 0 });
+    expect(paymentFor("udhaar", rs(12000))).toEqual({ cash: 0, upi: 0 });
+  });
+});
+
+describe("changedLines (what voice just changed)", () => {
+  it("finds lines that are new or different, by position", () => {
+    const before = [{ grade: 1 as const, qty: 10 }, { grade: 2 as const, qty: 5 }];
+    expect(changedLines(before, before)).toEqual([]);
+    expect(changedLines(before, [...before, { grade: 3, qty: 2 }])).toEqual([2]);
+    expect(changedLines(before, [{ grade: 1, qty: 12 }, { grade: 2, qty: 5 }])).toEqual([0]);
+    expect(changedLines(before, [{ grade: 1, qty: 10 }, { grade: 2, qty: 5, rate: rs(1300) }])).toEqual([1]);
+    expect(changedLines(before, [before[1]])).toEqual([0]);
+  });
+});
+
+describe("limitShare (how full the credit limit is)", () => {
+  it("is a whole percent, never above 100", () => {
+    expect(limitShare(rs(25000), rs(100000))).toBe(25);
+    expect(limitShare(rs(150000), rs(100000))).toBe(100);
+    expect(limitShare(-rs(500), rs(100000))).toBe(0);
+  });
+
+  it("a ₹0 limit is full as soon as anything is owed", () => {
+    expect(limitShare(0, 0)).toBe(0);
+    expect(limitShare(rs(1), 0)).toBe(100);
+  });
+});
+
+describe("revert (undo)", () => {
+  const read: BillDraft = { ...newDraft(), draftId: "a".repeat(32), state: "AWAITING_CONFIRM", customer: MANAT, items: [{ grade: 1, qty: 12 }], cash: rs(500) };
+  const before: BillDraft = { ...newDraft(), customer: MANAT, items: [{ grade: 1, qty: 10 }] };
+
+  it("brings back the earlier bill as kaccha, keeping its draft id, so it is read back again", () => {
+    expect(billReducer(read, { type: "revert", to: before })).toEqual({
+      ...read, state: "DRAFT", items: [{ grade: 1, qty: 10 }], cash: 0, upi: 0,
+    });
+  });
+
+  it("does nothing once the bill is saved", () => {
+    const saved = { ...read, state: "SAVED" as const, billId: 3 };
+    expect(billReducer(saved, { type: "revert", to: before })).toBe(saved);
   });
 });
