@@ -1,0 +1,115 @@
+"use client";
+// Customer search in a bottom sheet. Several matches become big buttons: "Kaun sa Afzal?"
+import { useState, type FormEvent } from "react";
+import { Drawer } from "vaul";
+import type { Customer, CustomerMatch } from "@/lib/customers.ts";
+import { addCustomer, friendlyError, searchCustomers } from "./api-client.ts";
+
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPick: (customer: Customer, fuzzyFrom?: string) => void;
+};
+
+const bigChoice =
+  "flex h-16 w-full items-center rounded-xl border-2 border-line bg-paper px-4 text-left text-xl font-semibold outline-coconut hover:border-ink focus-visible:outline-3";
+
+export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
+  const [text, setText] = useState("");
+  const [asked, setAsked] = useState("");
+  const [match, setMatch] = useState<CustomerMatch | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function choose(customer: Customer, fuzzyFrom?: string) {
+    onPick(customer, fuzzyFrom);
+    setText("");
+    setMatch(null);
+    setProblem(null);
+    onOpenChange(false);
+  }
+
+  async function search(event: FormEvent) {
+    event.preventDefault();
+    const typed = text.trim();
+    try {
+      const result = await searchCustomers(typed);
+      setAsked(typed);
+      if (result.kind === "found") choose(result.customer, result.fuzzy ? typed : undefined);
+      else setMatch(result);
+    } catch (error) {
+      setProblem(friendlyError(error));
+    }
+  }
+
+  async function addNew() {
+    try {
+      choose(await addCustomer(asked));
+    } catch (error) {
+      setProblem(friendlyError(error));
+    }
+  }
+
+  return (
+    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-ink/40" />
+        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-2xl bg-canvas outline-none">
+          <div aria-hidden className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-line" />
+          <div className="overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+            <Drawer.Title className="text-xl font-semibold">Customer chuno</Drawer.Title>
+            <Drawer.Description className="text-muted">Naam likho, jaise Afzal ya Manat.</Drawer.Description>
+
+            <form onSubmit={search} className="mt-4 flex gap-2">
+              <label htmlFor="customer-search" className="sr-only">Customer ka naam</label>
+              <input
+                id="customer-search"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="search"
+                className="h-14 min-w-0 flex-1 rounded-xl border border-line bg-paper px-4 text-xl outline-coconut focus-visible:outline-2"
+              />
+              <button
+                type="submit"
+                disabled={!text.trim()}
+                className="h-14 rounded-xl bg-ink px-5 text-lg font-semibold text-white outline-coconut outline-offset-2 focus-visible:outline-3 disabled:opacity-40"
+              >
+                Dhundo
+              </button>
+            </form>
+
+            {problem && <p role="alert" className="mt-3 font-medium text-red">{problem}</p>}
+
+            {match?.kind === "ambiguous" && (
+              <div className="mt-5">
+                <p className="text-lg font-semibold">Kaun sa {asked}?</p>
+                <ul className="mt-3 space-y-2">
+                  {match.options.map((c) => (
+                    <li key={c.id}>
+                      <button onClick={() => choose(c)} className={bigChoice}>{c.name}</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {match?.kind === "not_found" && (
+              <div className="mt-5">
+                <p className="text-lg font-semibold">&ldquo;{asked}&rdquo; list mein nahi hai. Naya customer hai?</p>
+                <button
+                  onClick={addNew}
+                  className="mt-3 h-16 w-full rounded-xl bg-coconut text-xl font-semibold text-white outline-coconut outline-offset-2 hover:bg-coconut-deep focus-visible:outline-3"
+                >
+                  Haan, {asked} ko add karo
+                </button>
+                <p className="mt-2 text-sm text-muted">Naye customer ki limit ₹0 se shuru hoti hai.</p>
+              </div>
+            )}
+
+            {match?.kind === "unclear" && <p className="mt-5 text-lg font-semibold">Naam samajh nahi aaya. Phir se likho.</p>}
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
