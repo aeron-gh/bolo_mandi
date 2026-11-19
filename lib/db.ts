@@ -47,11 +47,22 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
   id                  INTEGER PRIMARY KEY,
   customer_id         INTEGER NOT NULL REFERENCES customers(id),
   bill_id             INTEGER REFERENCES bills(id),
+  draft_id            TEXT    UNIQUE,
   kind                TEXT    NOT NULL CHECK (kind IN ('opening', 'bill', 'payment')),
   mode                TEXT    CHECK (mode IN ('cash', 'upi')),
   amount_paise        INTEGER NOT NULL,
   balance_after_paise INTEGER NOT NULL,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now'))
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS promises (
+  id           INTEGER PRIMARY KEY,
+  draft_id     TEXT    NOT NULL UNIQUE,
+  customer_id  INTEGER NOT NULL REFERENCES customers(id),
+  amount_paise INTEGER NOT NULL CHECK (amount_paise > 0),
+  due_date     TEXT    NOT NULL,
+  status       TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'kept', 'broken')),
+  created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 ) STRICT;
 `;
 
