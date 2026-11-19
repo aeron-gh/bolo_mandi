@@ -1,5 +1,5 @@
 "use client";
-// The counter screen: customer on top, receipt in the middle, mic in the thumb zone.
+// Conversation and bill share a draft until the owner confirms the sale.
 import { useEffect, useReducer, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { Drawer } from "vaul";
@@ -11,6 +11,7 @@ import { formatRupees } from "@/lib/money.ts";
 import { hindiReadBack } from "@/lib/readback.ts";
 import type { FollowUp } from "@/lib/voice.ts";
 import { confirmBill, fetchPreview, friendlyError, interpretBill, type BillBody } from "./api-client.ts";
+import { Conversation, type Message } from "./conversation.tsx";
 import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
 import { Dock, type MainAction } from "./dock.tsx";
@@ -59,7 +60,7 @@ function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean
   if (draft.state === "AWAITING_CONFIRM") {
     const over = preview?.credit === "over";
     const label = saving ? "Kaat rahe hain" : over ? "Limit ke bahar, phir bhi kaat do" : "Haan, kaat do";
-    return { action: { label, tone: over ? "danger" : "go", disabled: saving || !fresh }, hint: "Kuch badalna hai? Bolo ya Likho mein badlo." };
+    return { action: { label, tone: over ? "danger" : "go", disabled: saving || !fresh }, hint: null };
   }
   const missing = whatIsMissing(draft);
   const hint =
@@ -79,22 +80,18 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const [saving, setSaving] = useState(false);
   const saveInFlight = useRef(false);
   const [words, setWords] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
   const [voice, setVoice] = useState<"idle" | "recording" | "interpreting">("idle");
   const voiceRequest = useRef<AbortController | null>(null);
   const reviewRequested = useRef(false);
   const [followUp, setFollowUp] = useState<FollowUp | null>(null);
   const [voiceQuestion, setVoiceQuestion] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; speech: string } | null>(null);
+  const [accountQuestion, setAccountQuestion] = useState(false);
   const [suggestion, setSuggestion] = useState<CustomerSuggestion | null>(null);
   const [pickNote, setPickNote] = useState<string | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [likhoOpen, setLikhoOpen] = useState(false);
-  const likhoPanel = useRef<HTMLElement>(null);
-
-  function openLikho() {
-    const input = likhoPanel.current?.querySelector("input:not(:disabled)");
-    if (input instanceof HTMLInputElement && input.getClientRects().length) input.focus();
-    else setLikhoOpen(true);
-  }
 
   const body: BillBody | null = draft.customer
     ? { customerId: draft.customer.id, items: draft.items, cash: draft.cash, upi: draft.upi }
@@ -184,7 +181,9 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
         return setError("Hisaab badal gaya. Naya hisaab dekh ke phir se haan bolo.");
       }
       dispatch({ type: "saved", billId: result.billId });
-      speakHindi(`बिल नंबर ${result.billId} कट गया।`);
+      const speech = `बिल नंबर ${result.billId} कट गया।`;
+      setAnswer({ text: `Bill no. ${result.billId} kat gaya.`, speech });
+      speakHindi(speech);
       // Toast after the stamp has landed (at once when motion is reduced).
       const wait = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 450;
       const name = draft.customer?.name ?? "";
@@ -203,6 +202,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
     setVoice("recording");
     setWords("");
     setError(null);
+    setAnswer(null);
   }
 
   function askNext(missing: ReturnType<typeof whatIsMissing>, pending: FollowUp | null) {
@@ -212,7 +212,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   }
 
   async function finishVoice(text: string, problem?: string) {
-    setWords(text);
+    setWords("");
     if (!text) {
       setVoice("idle");
       if (problem) {
@@ -221,13 +221,22 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
       }
       return;
     }
+    setMessages((history) => [
+      ...history,
+      ...(history.length && reply ? [{ author: "bolo", text: reply } as const] : []),
+      { author: "owner", text },
+    ]);
     setVoice("interpreting");
     const controller = new AbortController();
     voiceRequest.current = controller;
     try {
-      const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, !draft.customer, followUp, controller.signal);
+      const turn = await interpretBill(text, { items: draft.items, cash: draft.cash, upi: draft.upi }, draft.customer?.id ?? null, followUp, accountQuestion, controller.signal);
       if (controller.signal.aborted) return;
-      if (turn.kind === "confirm") {
+      if (turn.kind !== "repeat") setAccountQuestion(turn.kind === "answer" && Boolean(turn.needsName));
+      if (turn.kind === "answer") {
+        setAnswer(turn);
+        speakHindi(turn.speech);
+      } else if (turn.kind === "confirm") {
         if (draft.state === "AWAITING_CONFIRM" && fresh) void confirm();
         else if (whatIsMissing(draft) || followUp) askNext(whatIsMissing(draft), followUp);
         else setError("Pehle bill ka hisaab suno, phir haan bolo.");
@@ -281,45 +290,58 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const busy = saving || voice !== "idle";
   const { action, hint } = mainAction(draft, { preview: preview?.data ?? null, fresh }, saving);
   const run = locked ? onNewBill : draft.state === "AWAITING_CONFIRM" ? () => void confirm() : review;
-  const question = draft.state === "AWAITING_CONFIRM" && fresh ? (preview?.data.say ?? null) : null;
+  const question = draft.state === "AWAITING_CONFIRM" && fresh
+    ? preview?.data.credit === "over" ? "Limit se upar hai. Phir bhi bill kaat doon?" : "Hisaab dekh lo. Bill kaat doon?"
+    : null;
   const customerQuestion = suggestion?.match.kind === "ambiguous"
     ? `Kaun sa ${suggestion.name}? Poora naam bolo ya customer chuno.`
     : suggestion && `"${suggestion.name}" ka naam nahi mila. Phir se bolo ya customer chuno.`;
   const nextQuestion = customerQuestion ?? voiceQuestion ?? nextVoiceQuestion(followUp, null)?.[0];
+  const pendingProblem = error ?? (previewError?.key === key ? previewError.message : null);
+  const reply = pendingProblem ?? answer?.text ?? question ?? nextQuestion ?? null;
+  const micDisabled = locked || saving || voice === "interpreting" || customerOpen || likhoOpen;
+
+  function submitText(text: string) {
+    if (busy || micDisabled) return;
+    startVoice();
+    void finishVoice(text);
+  }
   const panel = <EntryPanel items={draft.items} cash={draft.cash} upi={draft.upi} rates={rates} locked={locked || busy} dispatch={edit} />;
 
   return (
-    <main className="grid flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_26rem]">
-      <div className="flex min-w-0 flex-col">
-        <div className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 py-5">
-          <CustomerHeader
-            customer={draft.customer}
-            account={preview?.data.customer.id === draft.customer?.id ? preview?.data.customer ?? null : null}
-            note={pickNote}
-            locked={locked || busy}
-            onChange={() => setCustomerOpen(true)}
-          />
-          <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
-            onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
+    <main className="mx-auto grid w-full max-w-7xl flex-1 gap-4 p-3 sm:p-5 lg:min-h-[calc(100dvh-4.5rem)] lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <section aria-labelledby="conversation-heading" className="flex min-h-[70dvh] min-w-0 flex-col rounded-3xl border border-white/90 bg-[radial-gradient(ellipse_at_85%_0%,#f0eadf_0%,transparent_45%),linear-gradient(145deg,#ecf5f9,#eff0f8_75%,#f8fafc)] p-3 shadow-[0_12px_44px_#25395310] sm:p-5 lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]">
+        <div className="flex items-center justify-between border-b border-[#cbd8e5]/70 pb-3">
+          <h1 id="conversation-heading" className="px-1 text-lg font-semibold tracking-tight text-[#253953]">Bolo conversation</h1>
+          <a href="#bill-workspace" className="rounded-lg px-2 py-1 text-sm font-semibold text-[#365b84] lg:hidden">Bill dekho</a>
         </div>
-        <Dock
-          words={words}
-          question={error ? null : question ?? nextQuestion ?? null}
-          problem={error ?? (previewError?.key === key ? previewError.message : null)}
-          action={{ ...action, disabled: action.disabled || Boolean(followUp), run }}
-          hint={nextQuestion || error ? null : hint}
-          busy={busy}
-          micDisabled={locked || saving || voice === "interpreting" || customerOpen || likhoOpen}
-          onReplay={question ? review : null}
-          onStart={startVoice}
-          onWords={setWords}
-          onFinish={(text, problem) => void finishVoice(text, problem)}
-          onLikho={openLikho}
-        />
-      </div>
+        <Conversation messages={messages} words={voice === "recording" ? words : ""}
+          reply={voice === "idle" ? reply : null}
+          onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? review : null}
+          onExample={submitText} disabled={busy || micDisabled} />
+        <Dock action={{ ...action, disabled: action.disabled || Boolean(followUp), run }}
+          hint={reply ? null : hint} busy={busy} micDisabled={micDisabled}
+          onStart={startVoice} onWords={setWords}
+          onFinish={(text, problem) => void finishVoice(text, problem)} onType={submitText}
+          onLikho={() => setLikhoOpen(true)} />
+      </section>
 
-      <aside ref={likhoPanel} className="hidden border-l border-line bg-paper lg:block" aria-label="Likho">
-        <div className="sticky top-0 p-6">{panel}</div>
+      <aside id="bill-workspace" aria-label="Bill workspace" className="min-w-0 space-y-3 rounded-3xl border border-white/90 bg-white/65 p-3 shadow-[0_12px_44px_#25395310] sm:p-4">
+        <div className="hidden items-center gap-3 rounded-2xl border border-[#dfe5ef] bg-[#eef1f8] p-3 lg:flex">
+          <span aria-hidden className="grid size-10 place-items-center rounded-xl bg-[#253953] text-sm font-semibold text-white">AM</span>
+          <div>
+            <p className="font-semibold text-[#253953]">Aarav Mehta</p>
+            <p className="text-xs text-[#52627b]">Demo owner</p>
+          </div>
+        </div>
+        <h2 className="px-1 pt-2 font-semibold text-[#253953]">Current bill</h2>
+        <div className="rounded-2xl border border-line bg-paper p-3 shadow-sm">
+          <CustomerHeader customer={draft.customer}
+            account={preview?.data.customer.id === draft.customer?.id ? preview?.data.customer ?? null : null}
+            note={pickNote} locked={locked || busy} onChange={() => setCustomerOpen(true)} />
+        </div>
+        <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
+          onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
       </aside>
 
       <CustomerSheet key={suggestion ? `voice:${suggestion.name}` : "manual"} open={customerOpen} suggestion={suggestion} onOpenChange={setCustomerOpen} onPick={pick} />

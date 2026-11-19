@@ -90,7 +90,52 @@ export function searchCustomers(db: DatabaseSync, q: string | null): CustomerMat
   return findCustomer(q ?? "", loadCustomers(db));
 }
 
-export type VoiceBillResult = VoiceTurn & { match?: CustomerMatch };
+type VoiceQuestion = Extract<VoiceTurn, { kind: "question" }>;
+type VoiceAnswer = { kind: "answer"; text: string; speech: string; needsName?: true };
+export type VoiceBillResult = (Exclude<VoiceTurn, VoiceQuestion> & { match?: CustomerMatch }) | VoiceAnswer;
+
+function answerVoice(db: DatabaseSync, turn: VoiceQuestion, customerId: unknown): VoiceAnswer {
+  const answer = (text: string, speech: string, needsName?: true): VoiceAnswer => ({ kind: "answer", text, speech, needsName });
+  const rupees = (paise: number) => `${formatRupees(paise).slice(1)} रुपये`;
+  if (turn.query === "sales") {
+    const day = db.prepare(`
+      SELECT count(*) AS bills, coalesce(sum(total_paise), 0) AS total,
+        coalesce(sum(cash_paise), 0) AS cash, coalesce(sum(upi_paise), 0) AS upi,
+        coalesce(sum(udhaar_paise), 0) AS udhaar
+      FROM bills
+      WHERE date(created_at, '+05:30') = date('now', '+05:30')
+    `).get() as { bills: number; total: number; cash: number; upi: number; udhaar: number };
+    return answer(
+      `Aaj ${day.bills} bill, ${formatRupees(day.total)} ki sale. Cash ${formatRupees(day.cash)}, UPI ${formatRupees(day.upi)}, udhaar ${formatRupees(day.udhaar)}.`,
+      `आज ${day.bills} बिलों में ${rupees(day.total)} की बिक्री हुई। कैश ${rupees(day.cash)}, यूपीआई ${rupees(day.upi)}, उधार ${rupees(day.udhaar)}।`,
+    );
+  }
+  if (turn.query === "topDebt") {
+    const top = db.prepare("SELECT name, outstanding_paise AS outstanding FROM customers WHERE outstanding_paise > 0 ORDER BY outstanding_paise DESC, name LIMIT 1")
+      .get() as { name: string; outstanding: number } | undefined;
+    return top
+      ? answer(`Sabse zyada udhaar ${top.name} ka hai, ${formatRupees(top.outstanding)}.`, `सबसे ज़्यादा उधार ${top.name} का है, ${rupees(top.outstanding)}।`)
+      : answer("Kisi customer ka udhaar baaki nahi hai.", "किसी ग्राहक का उधार बाकी नहीं है।");
+  }
+  if (turn.query !== "khata") throw new Error("unknown voice question");
+  const match = turn.name ? searchCustomers(db, spokenName(turn.name)) : null;
+  if (match?.kind === "ambiguous") {
+    const names = match.options.map(({ name }) => name).join(", ");
+    return answer(`Kaun sa customer? ${names}. Poora naam bolo.`, `कौन सा ग्राहक? ${names}। पूरा नाम बताइए।`, true);
+  }
+  if (match && match.kind !== "found") return answer("Customer ka naam nahi mila. Poora naam bolo.", "ग्राहक का नाम नहीं मिला। पूरा नाम बताइए।", true);
+  const id = match?.customer.id ?? customerId;
+  if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+    return answer("Kiska hisaab bataun? Naam bolo.", "किसका हिसाब बताऊँ? नाम बोलें।", true);
+  }
+  const account = getAccount(db, id);
+  const balance = formatRupees(Math.abs(account.outstanding));
+  const label = account.outstanding < 0 ? "advance" : "udhaar";
+  return answer(
+    `${account.name} ka ${label} ${balance} hai. Credit limit ${formatRupees(account.creditLimit)} hai.`,
+    `${account.name} का ${account.outstanding < 0 ? "एडवांस" : "उधार"} ${rupees(Math.abs(account.outstanding))} है। क्रेडिट लिमिट ${rupees(account.creditLimit)} है।`,
+  );
+}
 
 // Interpret and look up a name in one request. The voice endpoint never writes.
 export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): VoiceBillResult {
@@ -107,7 +152,8 @@ export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): Voi
       followUp = { kind: "payment", mode: asked.mode };
     }
   }
-  const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true, followUp);
+  const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true, followUp, raw.accountQuestion === true);
+  if (turn.kind === "question") return answerVoice(db, turn, raw.customerId);
   if (turn.kind !== "edit" || !turn.name) return turn;
   const name = spokenName(turn.name);
   return { ...turn, name, match: searchCustomers(db, name) };

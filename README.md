@@ -40,6 +40,10 @@ choose one from the customer list.
 
 You can also speak in steps. Say “Vikas ko das piece,” then answer “do number”
 when Bolo asks for the grade. If it asks how much cash arrived, say the amount.
+You can ask “Vikas ka hisaab batao,” “Aaj kitni sale hui?” or “Sabse zyada
+udhaar kiska hai?” Bolo reads the answer aloud and keeps the current bill.
+The conversation pane also accepts typed commands. Aarav Mehta is a demo
+owner label for the workspace.
 
 Bolo reads back the total, payment split, new udhaar and any credit warning in
 Hindi using the browser's speech voice. Check the receipt, then say “haan, kaat

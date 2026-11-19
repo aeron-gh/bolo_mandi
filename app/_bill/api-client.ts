@@ -23,8 +23,8 @@ export const fetchPreview = (body: BillBody, signal: AbortSignal) =>
   call<BillPreview>("/api/bills/preview", post(body, signal));
 export const confirmBill = (body: BillBody & { draftId: string; allowOverLimit: boolean }) =>
   call<SaveResult>("/api/bills", post(body));
-export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, needsCustomer: boolean, followUp: FollowUp | null, signal: AbortSignal) =>
-  call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, needsCustomer, followUp }, signal));
+export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, customerId: number | null, followUp: FollowUp | null, accountQuestion: boolean, signal: AbortSignal) =>
+  call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, customerId, needsCustomer: customerId === null, followUp, accountQuestion }, signal));
 
 // Server messages are for developers; the trader gets a plain Hinglish line.
 const FRIENDLY: [RegExp, string][] = [

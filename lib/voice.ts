@@ -9,6 +9,8 @@ export type FollowUp =
   | { kind: "payment"; mode?: "cash" | "upi" };
 export type VoiceTurn =
   | { kind: "confirm" | "review" | "cancel" }
+  | { kind: "question"; query: "khata"; name?: string }
+  | { kind: "question"; query: "sales" | "topDebt" }
   | { kind: "repeat"; reason: "unclear" | "payment" | "line" }
   | { kind: "edit"; name?: string; entries: BillEntries; followUp?: FollowUp | null };
 
@@ -25,6 +27,9 @@ for (const group of [
   "nahi nahin नहीं", "arre are अरे", "ruk रुको रुक", "hata हटा", "badal बदल",
   "cancel कैंसल कैंसिल रद्द", "rehne रहने", "banao बनाओ", "padho पढ़ो पढ़ो",
   "kuch कुछ", "paise पैसे", "baad बाद", "hazaar hazar hajar hajaar हजार हज़ार",
+  "aaj आज", "kitni कितनी", "kitna कितना", "sale sales सेल बिक्री bikri", "hui हुई",
+  "hisaab hisab हिसाब", "bata batao बताओ बता बताइए", "limit लिमिट सीमा",
+  "iska इसका", "inka इनका", "sabse सबसे", "zyada zyadaa jyada ज्यादा ज़्यादा", "kiska किसका",
   "lakh lac लाख", "sau सौ", "dedh डेढ़ डेढ़", "dhai ढाई", "saadhe sadhe साढ़े साढ़े",
   "1 ek one एक", "2 two", "3 teen three तीन", "4 char chaar four चार",
   "5 panch paanch five पांच पाँच", "6 che chhe six छह छः", "7 saat seven सात", "8 aath eight आठ",
@@ -158,7 +163,7 @@ function applyPayments(entries: BillEntries, payments: Payment[], total: number)
   return true;
 }
 
-export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean, pending?: FollowUp): VoiceTurn {
+export function interpretVoice(text: string, current: BillEntries, rates: RateCard, needsCustomer: boolean, pending?: FollowUp, accountQuestion = false): VoiceTurn {
   if (!clearSpeech(text)) return { kind: "repeat", reason: "unclear" };
   let command = normalize(text).replace(/^arre /, "");
   if (/^(?:haan(?: pata hai)?(?: ,? ?(?:phir bhi )?(?:bill )?kaat do)?|(?:bill )?kaat do)$/.test(command)) {
@@ -168,6 +173,13 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
     return { kind: "cancel" };
   }
   if (/^(?:bill banao|bill padho|dobara padho|फिर से पढ़ो)$/.test(command)) return { kind: "review" };
+  if (/^aaj (?:ki )?(?:kitni sale|sale kitni)(?: hui| hai)?$/.test(command)) return { kind: "question", query: "sales" };
+  if (/^sabse zyada udhaar kiska(?: hai)?$/.test(command)) return { kind: "question", query: "topDebt" };
+  const namedKhata = command.match(/^([\p{L}\p{M} .'-]+?) (?:ka|ki) (?:(?:hisaab|udhaar|limit)(?: bata| kitna hai)?|kitna udhaar hai)$/u);
+  if (namedKhata) return { kind: "question", query: "khata", name: namedKhata[1] };
+  if (/^(?:(?:iska|inka) )?(?:hisaab|udhaar|limit)(?: bata| kitna hai)$|^kitna udhaar hai$/.test(command)) {
+    return { kind: "question", query: "khata" };
+  }
 
   if (pending?.kind === "grade") {
     const label = command.match(new RegExp(`^${GRADE_LABEL}$`));
@@ -271,8 +283,9 @@ export function interpretVoice(text: string, current: BillEntries, rates: RateCa
       continue;
     }
 
-    if (needsCustomer && !name && clauses.length === 1 && /^[\p{L}\p{M}'-]+(?: [\p{L}\p{M}'-]+){0,3}$/u.test(fragment)
+    if ((needsCustomer || accountQuestion) && !name && clauses.length === 1 && /^[\p{L}\p{M}'-]+(?: [\p{L}\p{M}'-]+){0,3}$/u.test(fragment)
       && !/\b(?:grade|number|piece|crate|bill|udhaar|ka|ko|kar|print|whatsapp|hisaab)\b/.test(fragment)) {
+      if (accountQuestion) return { kind: "question", query: "khata", name: fragment };
       name = fragment;
       continue;
     }

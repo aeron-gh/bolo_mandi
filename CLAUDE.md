@@ -41,6 +41,8 @@ The browser recognition path can show text while the trader speaks. The local Wh
 
 ## Verification at handoff
 
-- `npm test` passed all 123 tests. `npm run lint`, `npm run typecheck`, and `git diff --check` passed.
-- `npm run build -- --webpack` passed. The default Turbopack production build hit a local port-binding restriction in this environment during the earlier verification. The running local dev page responded and generated the worker bundle.
+Bolo now answers account, today's sales, and highest outstanding balance questions while preserving the draft. The workspace pairs a conversation log and typed composer with the bill panel. Aarav Mehta is a display-only demo owner. The voice control uses the supplied silent orb video and pauses when idle or when reduced motion is requested.
+
+- `npm test` passed all 128 tests. `npm run lint`, `npm run typecheck`, `git diff --check`, and the default Turbopack production build passed.
+- A live Sarvam Chrome test used three synthesized Hindi clips. Bolo drafted an order, answered a spoken account question while the grade was pending, then applied the spoken grade to the same draft. The test issued no save request.
 - The Chrome smoke test used synthesized Hindi recordings and an injected browser speech-service failure. The real fallback transcribed three turns, filled in the customer, grade, and cash, and saved one bill after explicit confirmation in a temporary SQLite database. In that run the cold fallback took about 25 seconds after release including model setup, while the two warm turns took about 2.1 seconds each. These timings are from one machine, and live trader audio in a noisy mandi still needs testing.

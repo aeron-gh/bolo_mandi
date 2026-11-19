@@ -41,14 +41,6 @@ button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-/* Printed receipt: torn bottom edge. */
-.torn-edge {
-  --tooth: 12px;
-  mask:
-    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / var(--tooth) 51% repeat-x,
-    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth) / 2) no-repeat;
-}
-
 /* Animation 2: a new bill row slides in from 8px below. */
 @keyframes row-in {
   from {

@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { clearSpeech } from "@/lib/voice-text.ts";
 import { listenInBrowser } from "./browser-recognition.ts";
-import { MicIcon } from "./icons.tsx";
 import { decodeSpeech, hasSpeech, transcribeOnDevice, warmOnDevice } from "./on-device-speech.ts";
 
 import { listenWithSarvam, sarvamAvailable } from "./sarvam-recognition.ts";
@@ -62,6 +61,7 @@ function watchLevel(ring: HTMLSpanElement, stream: MediaStream): (() => void) | 
 
 export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
   const ring = useRef<HTMLSpanElement>(null);
+  const orb = useRef<HTMLVideoElement>(null);
   const session = useRef<Session | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const held = phase === "connecting" || phase === "listening";
@@ -71,6 +71,23 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
     void sarvamAvailable();
     return () => session.current?.dispose();
   }, []);
+
+  useEffect(() => {
+    const video = orb.current;
+    if (!video) return;
+    const motion = matchMedia("(prefers-reduced-motion: reduce)");
+    function sync() {
+      if (!video) return;
+      if ((held || processing) && !motion.matches) void video.play().catch(() => {});
+      else video.pause();
+    }
+    sync();
+    motion.addEventListener("change", sync);
+    return () => {
+      motion.removeEventListener("change", sync);
+      video.pause();
+    };
+  }, [held, processing]);
 
   function start() {
     if (disabled || session.current) return;
@@ -236,18 +253,22 @@ export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
         onContextMenu={(event) => event.preventDefault()}
         onKeyDown={(event) => onKey(event, true)}
         onKeyUp={(event) => onKey(event, false)}
-        className={`relative grid size-22 touch-none select-none place-items-center rounded-full text-white outline-coconut outline-offset-4 focus-visible:outline-3 disabled:opacity-40 ${held ? "bg-coconut-deep" : "bg-coconut"}`}
+        className={`relative grid size-12 touch-none select-none place-items-center rounded-full border border-white/30 bg-[#0b1410] outline-[#395f80] outline-offset-4 focus-visible:outline-3 sm:size-14 ${held ? "shadow-[0_0_22px_#7dcaa964]" : "shadow-[0_0_14px_#7dcaa933]"} disabled:cursor-default`}
       >
         <span
           ref={ring}
           aria-hidden
-          className={`pointer-events-none absolute -inset-1 rounded-full border-[6px] border-coconut/30 ${held ? "opacity-100" : "opacity-0"}`}
+          className={`pointer-events-none absolute -inset-1 rounded-full border border-emerald-300/40 ${held ? "opacity-100" : "opacity-0"}`}
         />
-        <MicIcon className="size-9" />
+        <span aria-hidden className="pointer-events-none absolute inset-0 isolate overflow-hidden rounded-full bg-[url('/voice-orb.jpg')] bg-cover bg-center">
+          <video ref={orb} src="/voice-orb.mp4" poster="/voice-orb.jpg" preload="none" muted loop playsInline
+            className="h-full w-full object-cover" />
+          <span className="absolute inset-0 bg-[#6bc5a1] opacity-65 mix-blend-color" />
+        </span>
       </button>
-      <span role="status" className="text-center text-sm text-muted">{LABEL[phase]}</span>
+      <span role="status" className="text-center text-xs font-medium leading-snug text-[#435b75]">{LABEL[phase]}</span>
       {processing && (
-        <button type="button" onClick={() => session.current?.cancel()} className="min-h-11 px-3 font-medium text-coconut focus-visible:outline-2">
+        <button type="button" onClick={() => session.current?.cancel()} className="min-h-9 px-3 font-medium text-[#395f80] focus-visible:outline-2">
           Roko
         </button>
       )}

@@ -22,6 +22,27 @@ function say(words: string, entries = empty) {
 }
 
 describe("voice billing", () => {
+  it("answers a Hindi account question without editing the active draft", () => {
+    const entries = { ...empty, items: [{ grade: 2 as const, qty: 10 }] };
+    expect(voiceBill(db, rates, { ...entries, customerId: 8, words: "विकास का हिसाब बताओ।" })).toMatchObject({
+      kind: "answer", text: expect.stringContaining("₹8,000"),
+    });
+    expect(entries.items).toEqual([{ grade: 2, qty: 10 }]);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM bills").get()).toMatchObject({ n: 0 });
+  });
+
+  it("accepts a full customer name after asking which account to read", () => {
+    expect(say("Afzal ka hisaab batao")).toMatchObject({ kind: "answer", needsName: true });
+    expect(voiceBill(db, rates, { ...empty, words: "Afzal Ahmed", customerId: 8, accountQuestion: true })).toMatchObject({
+      kind: "answer", text: expect.stringContaining("Afzal Ahmed ka udhaar ₹20,000"),
+    });
+  });
+
+  it("reads sales and highest outstanding balance from the ledger data", () => {
+    expect(say("आज कितनी बिक्री हुई?")).toMatchObject({ kind: "answer", text: expect.stringContaining("0 bill, ₹0") });
+    expect(say("सबसे ज़्यादा उधार किसका है?")).toMatchObject({ kind: "answer", text: expect.stringContaining("Deepak ka hai, ₹3,50,000") });
+  });
+
   it.each([
     "Manat ko 10 piece grade 1, 5 piece grade 2 aur 10 piece grade 3 de dena. 4,000 cash diya hai, baaki udhaar likh de.",
     "मनत को दस पीस ग्रेड एक, पाँच पीस ग्रेड दो और १० पीस ग्रेड तीन दे देना। ४,००० कैश दिया है, बाकी उधार लिख दो।",
