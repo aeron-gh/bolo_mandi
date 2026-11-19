@@ -27,7 +27,7 @@ export function assertOwner(db: DatabaseSync, token: string | null, now: Date): 
   if (!ownerAllowed(db, token, now)) throw new PinRequired();
 }
 
-function text(b: Record<string, unknown>, key: string): string {
+export function textField(b: Record<string, unknown>, key: string): string {
   const value = b[key] ?? "";
   if (typeof value !== "string") throw new Error(`${key} must be text`);
   return value;
@@ -40,7 +40,7 @@ export function readShop(db: DatabaseSync): Shop {
 export function saveShop(db: DatabaseSync, token: string | null, now: Date, body: unknown): Shop {
   assertOwner(db, token, now);
   const b = asBody(body);
-  return updateShop(db, { shopName: text(b, "shopName"), ownerName: text(b, "ownerName"), phone: text(b, "phone"), address: text(b, "address") });
+  return updateShop(db, { shopName: textField(b, "shopName"), ownerName: textField(b, "ownerName"), phone: textField(b, "phone"), address: textField(b, "address") });
 }
 
 export function savePrices(db: DatabaseSync, token: string | null, now: Date, body: unknown): RateCard {
@@ -58,7 +58,7 @@ export function savePrices(db: DatabaseSync, token: string | null, now: Date, bo
 export function changePin(db: DatabaseSync, token: string | null, now: Date, body: unknown): { hasPin: true } {
   const b = asBody(body);
   if (getShop(db).hasPin) assertOwner(db, token, now);
-  setPin(db, text(b, "pin"), b.currentPin === undefined ? undefined : text(b, "currentPin"));
+  setPin(db, textField(b, "pin"), b.currentPin === undefined ? undefined : textField(b, "currentPin"));
   return { hasPin: true };
 }
 
@@ -68,7 +68,7 @@ const tries = new WeakMap<DatabaseSync, { count: number; until: number }>();
 export function unlock(db: DatabaseSync, now: Date, body: unknown): string {
   const state = tries.get(db) ?? { count: 0, until: 0 };
   if (now.getTime() < state.until) throw new Error("Bahut galat koshish. 5 minute baad try karein.");
-  if (!verifyPin(db, text(asBody(body), "pin"))) {
+  if (!verifyPin(db, textField(asBody(body), "pin"))) {
     const count = state.count + 1;
     tries.set(db, count >= MAX_TRIES ? { count: 0, until: now.getTime() + PAUSE_MS } : { count, until: 0 });
     throw new Error("Galat PIN");
