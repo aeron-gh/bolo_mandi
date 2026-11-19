@@ -1,5 +1,5 @@
 // Browser calls to our API routes. Type-only imports, so no server code reaches the browser.
-import type { BillPreview } from "@/lib/api.ts";
+import type { BillPreview, VoiceBillResult } from "@/lib/api.ts";
 import type { ItemInput, SaveResult } from "@/lib/billing.ts";
 import type { Customer, CustomerMatch } from "@/lib/customers.ts";
 
@@ -22,6 +22,8 @@ export const fetchPreview = (body: BillBody, signal: AbortSignal) =>
   call<BillPreview>("/api/bills/preview", post(body, signal));
 export const confirmBill = (body: BillBody & { draftId: string; allowOverLimit: boolean }) =>
   call<SaveResult>("/api/bills", post(body));
+export const interpretBill = (words: string, entries: Omit<BillBody, "customerId">, needsCustomer: boolean, signal: AbortSignal) =>
+  call<VoiceBillResult>("/api/bills/voice", post({ words, ...entries, needsCustomer }, signal));
 
 // Server messages are for developers; the trader gets a plain Hinglish line.
 const FRIENDLY: [RegExp, string][] = [

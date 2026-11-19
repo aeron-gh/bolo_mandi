@@ -25,7 +25,8 @@ export function CustomerHeader({ customer, account, note, locked, onChange }: Pr
     return (
       <button
         onClick={onChange}
-        className="flex h-20 w-full items-center rounded-xl border-2 border-dashed border-line px-4 text-left text-2xl font-semibold outline-coconut focus-visible:outline-3"
+        disabled={locked}
+        className="flex h-20 w-full items-center rounded-xl border-2 border-dashed border-line px-4 text-left text-2xl font-semibold outline-coconut focus-visible:outline-3 disabled:opacity-40"
       >
         Customer chuno
       </button>

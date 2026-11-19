@@ -42,9 +42,12 @@ export function calculateBill(items: ItemInput[], rates: RateCard) {
     const rate = item.rate ?? rates[item.grade];
     assertWhole(rate, "rate", 1);
     const unit = item.unit ?? "piece";
-    return { grade: item.grade, qty: item.qty, unit, rate, rateOverride, amount: rate * item.qty };
+    const amount = rate * item.qty;
+    assertWhole(amount, "line amount", 1);
+    return { grade: item.grade, qty: item.qty, unit, rate, rateOverride, amount };
   });
   const total = lines.reduce((sum, line) => sum + line.amount, 0);
+  assertWhole(total, "bill total", 0);
   return { lines, total };
 }
 
@@ -53,6 +56,7 @@ export function splitPayment(total: number, cash = 0, upi = 0): Split {
   assertWhole(cash, "cash", 0);
   assertWhole(upi, "upi", 0);
   const paid = cash + upi;
+  assertWhole(paid, "payment total", 0);
   if (paid > total) return { ok: false, extra: paid - total };
   return { ok: true, cash, upi, udhaar: total - paid };
 }

@@ -18,11 +18,13 @@ export type BillDraft = {
 
 export type Action =
   | { type: "setCustomer"; customer: Customer }
+  | { type: "voiceEdit"; customer: Customer | null; items: ItemInput[]; cash: number; upi: number }
   | { type: "addItem"; item: ItemInput }
   | { type: "updateItem"; index: number; changes: Partial<ItemInput> }
   | { type: "removeItem"; index: number }
   | { type: "setPayment"; cash?: number; upi?: number }
   | { type: "readBack"; draftId: string }
+  | { type: "reviewAgain" }
   | { type: "saved"; billId: number }
   | { type: "cancel" };
 
@@ -55,6 +57,8 @@ export function billReducer(draft: BillDraft, action: Action): BillDraft {
   switch (action.type) {
     case "setCustomer":
       return edit(draft, { customer: action.customer });
+    case "voiceEdit":
+      return edit(draft, { customer: action.customer, items: action.items, cash: action.cash, upi: action.upi });
     case "addItem":
       return edit(draft, { items: [...items, action.item] });
     case "updateItem":
@@ -68,6 +72,8 @@ export function billReducer(draft: BillDraft, action: Action): BillDraft {
     case "readBack":
       if (whatIsMissing(draft)) return draft;
       return { ...draft, state: "AWAITING_CONFIRM", draftId: draft.draftId ?? action.draftId };
+    case "reviewAgain":
+      return edit(draft, {});
     case "saved":
       return draft.state === "AWAITING_CONFIRM" ? { ...draft, state: "SAVED", billId: action.billId } : draft;
     case "cancel":

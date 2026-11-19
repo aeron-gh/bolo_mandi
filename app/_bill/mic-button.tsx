@@ -1,6 +1,4 @@
 "use client";
-// Hold to speak. The ring grows with voice loudness; the words go up to the parent.
-// Turning words into bill actions comes with the voice step.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MicIcon } from "./icons.tsx";
 
@@ -11,113 +9,159 @@ type Recognition = {
   continuous: boolean;
   start(): void;
   stop(): void;
-  onresult: ((event: { resultIndex: number; results: ArrayLike<Result> }) => void) | null;
+  abort(): void;
+  onresult: ((event: { results: ArrayLike<Result> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
 };
 type RecognitionClass = new () => Recognition;
 
-// Chrome still ships speech recognition under the webkit name.
-function recognitionClass(): RecognitionClass | null {
+function recognitionClass(): RecognitionClass | undefined {
   const w = window as unknown as { SpeechRecognition?: RecognitionClass; webkitSpeechRecognition?: RecognitionClass };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-type Props = { onWords: (text: string) => void; onProblem: (message: string | null) => void };
+type Props = {
+  disabled: boolean;
+  onStart: () => void;
+  onWords: (text: string) => void;
+  onFinish: (text: string, problem?: string) => void;
+};
 
-export function MicButton({ onWords, onProblem }: Props) {
-  const ring = useRef<HTMLSpanElement>(null);
-  const wanted = useRef(false);
-  const live = useRef<(() => void) | null>(null);
-  const [held, setHeld] = useState(false);
+type Session = { release: () => void; discard: () => void; dispose: () => void };
 
-  useEffect(() => () => live.current?.(), []);
+const REPEAT = "Awaaz saaf nahi aayi. Phir se bolo ya Likho kholo.";
 
-  // Loudness ring: read the mic level every frame and scale the ring directly (no re-render).
-  function watchLevel(stream: MediaStream): () => void {
-    const audio = new AudioContext();
+function recognitionProblem(error: string): string {
+  if (error === "not-allowed" || error === "service-not-allowed") return "Browser mein mic allow karo, ya Likho kholo.";
+  if (error === "network") return "Awaaz ki service se connection nahi hua. Phir se bolo ya Likho kholo.";
+  return REPEAT;
+}
+
+// The separate level meter is optional. Recognition can still work if the browser cannot open it.
+async function watchLevel(ring: HTMLSpanElement, active: () => boolean): Promise<(() => void) | undefined> {
+  if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const release = () => stream.getTracks().forEach((track) => track.stop());
+  if (!active()) {
+    release();
+    return;
+  }
+  let audio: AudioContext | undefined;
+  try {
+    audio = new AudioContext();
     const analyser = audio.createAnalyser();
     analyser.fftSize = 512;
     audio.createMediaStreamSource(stream).connect(analyser);
     const samples = new Uint8Array(analyser.fftSize);
-    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frame = 0;
     const tick = () => {
       analyser.getByteTimeDomainData(samples);
       let sum = 0;
-      for (const s of samples) sum += ((s - 128) / 128) ** 2;
+      for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
       const level = Math.min(1, Math.sqrt(sum / samples.length) * 5);
-      if (ring.current && !calm) ring.current.style.transform = `scale(${1 + level * 0.5})`;
+      ring.style.transform = `scale(${1 + level * 0.5})`;
       frame = requestAnimationFrame(tick);
     };
     tick();
+    const meter = audio;
     return () => {
       cancelAnimationFrame(frame);
-      void audio.close();
-      if (ring.current) ring.current.style.transform = "";
+      ring.style.transform = "";
+      release();
+      void meter.close();
     };
+  } catch {
+    release();
+    if (audio) void audio.close();
   }
+}
 
-  // Live words in Hindi/Hinglish from the browser's free speech-to-text.
-  function listen(Recognizer: RecognitionClass): () => void {
+export function MicButton({ disabled, onStart, onWords, onFinish }: Props) {
+  const ring = useRef<HTMLSpanElement>(null);
+  const session = useRef<Session | null>(null);
+  const [held, setHeld] = useState(false);
+
+  useEffect(() => () => session.current?.dispose(), []);
+
+  function start() {
+    if (disabled || session.current) return;
+    if (!window.isSecureContext) return onFinish("", "Mic sirf HTTPS ya localhost par chalta hai.");
+    const Recognizer = recognitionClass();
+    if (!Recognizer) return onFinish("", "Is browser mein mic se bill nahi banta. Chrome ya Likho try karo.");
+
     const rec = new Recognizer();
     rec.lang = "hi-IN";
     rec.interimResults = true;
     rec.continuous = true;
-    let said = "";
-    rec.onresult = (event) => {
-      let guess = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const r = event.results[i];
-        if (r.isFinal) said += `${r[0].transcript} `;
-        else guess += r[0].transcript;
-      }
-      onWords(`${said}${guess}`.trim());
-    };
-    rec.onerror = (event) => {
-      if (event.error !== "aborted" && event.error !== "no-speech") onProblem(`Sunne mein dikkat: ${event.error}`);
-    };
-    rec.start();
-    return () => rec.stop();
-  }
+    let finalized = "";
+    let released = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopLevel: (() => void) | undefined;
 
-  async function start() {
-    if (wanted.current) return;
-    wanted.current = true;
-    setHeld(true);
-    onProblem(null);
-    if (!window.isSecureContext) return onProblem("Mic sirf https ya localhost par chalta hai.");
-    const Recognizer = recognitionClass();
-    if (!Recognizer) return onProblem("Is browser mein bolna nahi chalta. Chrome kholo.");
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      return onProblem("Mic ki permission nahi mili. Browser mein mic allow karo.");
+    function dispose() {
+      session.current = null;
+      clearTimeout(timer);
+      stopLevel?.();
+      stopLevel = undefined;
+      rec.onresult = rec.onerror = rec.onend = null;
     }
-    // Released while the permission box was open: give the mic back at once.
-    if (!wanted.current) return stream.getTracks().forEach((t) => t.stop());
-    onWords("");
-    const stopLevel = watchLevel(stream);
-    const stopWords = listen(Recognizer);
-    live.current = () => {
-      stopWords();
-      stopLevel();
-      stream.getTracks().forEach((t) => t.stop());
-    };
-  }
 
-  function stop() {
-    wanted.current = false;
-    setHeld(false);
-    live.current?.();
-    live.current = null;
+    function discard(problem?: string) {
+      dispose();
+      rec.abort();
+      setHeld(false);
+      onFinish("", problem);
+    }
+
+    function release() {
+      if (released) return;
+      released = true;
+      setHeld(false);
+      stopLevel?.();
+      stopLevel = undefined;
+      // Some services never emit end after a failed stop. Drop that turn.
+      timer = setTimeout(() => discard(REPEAT), 5000);
+      rec.stop();
+    }
+
+    const recording: Session = { release, discard: () => { if (!released) discard(); }, dispose: () => { dispose(); rec.abort(); } };
+    rec.onresult = ({ results }) => {
+      const all = Array.from(results);
+      finalized = all.filter((result) => result.isFinal).map((result) => result[0].transcript.trim()).join(" ").trim();
+      onWords(all.map((result) => result[0].transcript.trim()).join(" ").trim());
+    };
+    rec.onerror = ({ error }) => discard(recognitionProblem(error));
+    rec.onend = () => {
+      dispose();
+      setHeld(false);
+      if (released && finalized) onFinish(finalized);
+      else onFinish("", REPEAT);
+    };
+
+    session.current = recording;
+    setHeld(true);
+    onStart();
+    try {
+      rec.start();
+    } catch {
+      discard(REPEAT);
+      return;
+    }
+    if (ring.current) {
+      const active = () => session.current === recording && !released;
+      void watchLevel(ring.current, active).then((cleanup) => {
+        if (active()) stopLevel = cleanup;
+        else cleanup?.();
+      }).catch(() => {});
+    }
   }
 
   function onKey(event: KeyboardEvent, down: boolean) {
     if (event.key !== " " && event.key !== "Enter") return;
     event.preventDefault();
-    if (down && !event.repeat) void start();
-    if (!down) stop();
+    if (down && !event.repeat) start();
+    if (!down) session.current?.release();
   }
 
   return (
@@ -126,16 +170,20 @@ export function MicButton({ onWords, onProblem }: Props) {
         type="button"
         aria-label="Daba ke bolo"
         aria-pressed={held}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          void start();
+        disabled={disabled}
+        onPointerDown={(event) => {
+          if (event.button !== 0 || !event.isPrimary) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          start();
         }}
-        onPointerUp={stop}
-        onPointerCancel={stop}
-        onContextMenu={(e) => e.preventDefault()}
-        onKeyDown={(e) => onKey(e, true)}
-        onKeyUp={(e) => onKey(e, false)}
-        className={`relative grid size-22 touch-none select-none place-items-center rounded-full text-white outline-coconut outline-offset-4 focus-visible:outline-3 ${held ? "bg-coconut-deep" : "bg-coconut"}`}
+        onPointerUp={() => session.current?.release()}
+        onPointerCancel={() => session.current?.discard()}
+        onLostPointerCapture={() => session.current?.discard()}
+        onBlur={() => session.current?.discard()}
+        onContextMenu={(event) => event.preventDefault()}
+        onKeyDown={(event) => onKey(event, true)}
+        onKeyUp={(event) => onKey(event, false)}
+        className={`relative grid size-22 touch-none select-none place-items-center rounded-full text-white outline-coconut outline-offset-4 focus-visible:outline-3 disabled:opacity-40 ${held ? "bg-coconut-deep" : "bg-coconut"}`}
       >
         <span
           ref={ring}

@@ -7,6 +7,7 @@ import { addCustomer, friendlyError, searchCustomers } from "./api-client.ts";
 
 type Props = {
   open: boolean;
+  suggestion: { name: string; match: CustomerMatch } | null;
   onOpenChange: (open: boolean) => void;
   onPick: (customer: Customer, fuzzyFrom?: string) => void;
 };
@@ -14,11 +15,12 @@ type Props = {
 const bigChoice =
   "flex h-16 w-full items-center rounded-xl border-2 border-line bg-paper px-4 text-left text-xl font-semibold outline-coconut hover:border-ink focus-visible:outline-3";
 
-export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
-  const [text, setText] = useState("");
-  const [asked, setAsked] = useState("");
-  const [match, setMatch] = useState<CustomerMatch | null>(null);
+export function CustomerSheet({ open, suggestion, onOpenChange, onPick }: Props) {
+  const [text, setText] = useState(suggestion?.name ?? "");
+  const [asked, setAsked] = useState(suggestion?.name ?? "");
+  const [match, setMatch] = useState<CustomerMatch | null>(suggestion?.match ?? null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   function choose(customer: Customer, fuzzyFrom?: string) {
     onPick(customer, fuzzyFrom);
@@ -31,6 +33,9 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
   async function search(event: FormEvent) {
     event.preventDefault();
     const typed = text.trim();
+    if (!typed || busy) return;
+    setBusy(true);
+    setProblem(null);
     try {
       const result = await searchCustomers(typed);
       setAsked(typed);
@@ -38,19 +43,26 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
       else setMatch(result);
     } catch (error) {
       setProblem(friendlyError(error));
+    } finally {
+      setBusy(false);
     }
   }
 
   async function addNew() {
+    if (busy) return;
+    setBusy(true);
+    setProblem(null);
     try {
       choose(await addCustomer(asked));
     } catch (error) {
       setProblem(friendlyError(error));
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={!busy}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-ink/40" />
         <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[88dvh] max-w-lg flex-col rounded-t-2xl bg-canvas outline-none">
@@ -64,6 +76,7 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
               <input
                 id="customer-search"
                 value={text}
+                disabled={busy}
                 onChange={(e) => setText(e.target.value)}
                 autoComplete="off"
                 enterKeyHint="search"
@@ -71,7 +84,7 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
               />
               <button
                 type="submit"
-                disabled={!text.trim()}
+                disabled={busy || !text.trim()}
                 className="h-14 rounded-xl bg-ink px-5 text-lg font-semibold text-white outline-coconut outline-offset-2 focus-visible:outline-3 disabled:opacity-40"
               >
                 Dhundo
@@ -86,7 +99,7 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
                 <ul className="mt-3 space-y-2">
                   {match.options.map((c) => (
                     <li key={c.id}>
-                      <button onClick={() => choose(c)} className={bigChoice}>{c.name}</button>
+                      <button onClick={() => choose(c)} disabled={busy} className={bigChoice}>{c.name}</button>
                     </li>
                   ))}
                 </ul>
@@ -98,6 +111,7 @@ export function CustomerSheet({ open, onOpenChange, onPick }: Props) {
                 <p className="text-lg font-semibold">&ldquo;{asked}&rdquo; list mein nahi hai. Naya customer hai?</p>
                 <button
                   onClick={addNew}
+                  disabled={busy}
                   className="mt-3 h-16 w-full rounded-xl bg-coconut text-xl font-semibold text-white outline-coconut outline-offset-2 hover:bg-coconut-deep focus-visible:outline-3"
                 >
                   Haan, {asked} ko add karo

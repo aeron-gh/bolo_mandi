@@ -34,3 +34,20 @@ export function readBackText(p: ReadBackInput): string {
   else parts.push("Bill kaat doon?");
   return parts.join(" ");
 }
+
+export function hindiReadBack(p: ReadBackInput & { overpaidBy: number }): string {
+  const money = (paise: number) => `${r(paise).slice(1)} रुपये`;
+  if (p.overpaidBy > 0) return `${money(p.overpaidBy)} ज़्यादा मिले हैं। कैश या यूपीआई की रकम ठीक करें।`;
+
+  const paid = [p.cash && `${money(p.cash)} कैश`, p.upi && `${money(p.upi)} यूपीआई`].filter(Boolean).join(" और ");
+  const parts = [`${p.customerName} का बिल ${money(p.total)} हुआ।`];
+  if (paid) parts.push(`${paid} मिले।`);
+  if (p.udhaar) parts.push(`${money(p.udhaar)} उधार में गए।`);
+  parts.push(p.newOutstanding < 0
+    ? `अब ${money(-p.newOutstanding)} एडवांस जमा हैं।`
+    : `अब कुल उधार ${money(p.newOutstanding)} है।`);
+  if (p.credit === "near") parts.push("लिमिट के पास है।");
+  if (p.credit === "over") parts.push(`लिमिट से ${money(p.overBy)} ऊपर है। फिर भी बिल काट दूँ?`);
+  else parts.push("बिल काट दूँ?");
+  return parts.join(" ");
+}

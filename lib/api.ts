@@ -9,6 +9,8 @@ import { addCustomer, findCustomer, getAccount, loadCustomers, type Account, typ
 import { getKhata, type Khata } from "./ledger.ts";
 import { formatRupees } from "./money.ts";
 import { readBackText } from "./readback.ts";
+import { spokenName } from "./spoken-name.ts";
+import { interpretVoice, type BillEntries, type VoiceTurn } from "./voice.ts";
 
 type BillRequest = { customerId: number; items: ItemInput[]; cash: number; upi: number };
 
@@ -86,6 +88,19 @@ export function confirmBill(db: DatabaseSync, rates: RateCard, body: unknown): S
 
 export function searchCustomers(db: DatabaseSync, q: string | null): CustomerMatch {
   return findCustomer(q ?? "", loadCustomers(db));
+}
+
+export type VoiceBillResult = VoiceTurn & { match?: CustomerMatch };
+
+// Interpret and look up a name in one request. The voice endpoint never writes.
+export function voiceBill(db: DatabaseSync, rates: RateCard, body: unknown): VoiceBillResult {
+  const raw = asBody(body);
+  if (typeof raw.words !== "string" || raw.words.length > 2000) throw new Error("unclear voice input");
+  const { items, cash, upi }: BillEntries = parseBill({ ...raw, customerId: 0 });
+  const turn = interpretVoice(raw.words, { items, cash, upi }, rates, raw.needsCustomer === true);
+  if (turn.kind !== "edit" || !turn.name) return turn;
+  const name = spokenName(turn.name);
+  return { ...turn, name, match: searchCustomers(db, name) };
 }
 
 // Only called after the trader said "haan, add karo".

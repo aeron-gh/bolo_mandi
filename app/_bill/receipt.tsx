@@ -7,7 +7,7 @@ import type { RateCard } from "@/lib/billing.ts";
 import type { BillDraft } from "@/lib/draft.ts";
 import { formatRupees as r } from "@/lib/money.ts";
 
-type Props = { draft: BillDraft; preview: BillPreview | null; fresh: boolean; rates: RateCard; onCancel: () => void };
+type Props = { draft: BillDraft; preview: BillPreview | null; fresh: boolean; rates: RateCard; blocked: boolean; onCancel: () => void };
 
 // Animation 3: the total rolls to its new value. NumberFlow skips it for reduced motion.
 const RUPEES = { style: "currency", currency: "INR", minimumFractionDigits: 2, trailingZeroDisplay: "stripIfInteger" } as const;
@@ -29,7 +29,7 @@ function Warning({ p }: { p: BillPreview }) {
   return null;
 }
 
-export function Receipt({ draft, preview, fresh, rates, onCancel }: Props) {
+export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Props) {
   const p = fresh ? preview : null;
   const open = draft.state === "DRAFT" || draft.state === "AWAITING_CONFIRM";
   if (draft.items.length === 0 && open) {
@@ -45,7 +45,7 @@ export function Receipt({ draft, preview, fresh, rates, onCancel }: Props) {
               <li key={i} className="row-in grid grid-cols-[1fr_auto_6rem] items-baseline gap-3 py-2">
                 <span className="font-semibold">Grade {item.grade}</span>
                 <span className="text-muted">
-                  {item.qty || "?"} × <span className={item.rate !== undefined ? "font-semibold text-ink" : ""}>{r(rate)}</span>
+                  {item.qty || "?"}{item.unit === "crate" ? " crate" : ""} × <span className={item.rate !== undefined ? "font-semibold text-ink" : ""}>{r(rate)}</span>
                 </span>
                 <span className="text-right">{p?.lines[i] ? r(p.lines[i].amount) : "…"}</span>
               </li>
@@ -66,7 +66,7 @@ export function Receipt({ draft, preview, fresh, rates, onCancel }: Props) {
         {p && open && <Warning p={p} />}
         {draft.state === "CANCELLED" && <p className="mt-3 font-semibold">Bill cancel hua. Kuch save nahi hua.</p>}
         {open && (
-          <button onClick={onCancel} className="mt-4 h-11 rounded-lg px-2 font-medium text-muted outline-coconut hover:text-ink focus-visible:outline-2">
+          <button onClick={onCancel} disabled={blocked} className="mt-4 h-11 rounded-lg px-2 font-medium text-muted outline-coconut hover:text-ink focus-visible:outline-2 disabled:opacity-40">
             Bill cancel karo
           </button>
         )}
