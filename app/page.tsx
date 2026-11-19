@@ -5,44 +5,44 @@ import { SiteHeader } from "./_site/site-header.tsx";
 import { SiteIcon, type SiteIconName } from "./_site/site-icons.tsx";
 
 const STEPS = [
-  { title: "Bolo", text: "Mic dabake boliye: customer ka naam, kitne piece, kaunsa grade, aur kitna cash ya UPI mila." },
-  { title: "Bolo padhke sunata hai", text: "Total, cash, UPI, udhaar aur naya hisaab Hindi mein sunata hai. Screen par bill saath saath banta hai." },
-  { title: "Haan, kaat do", text: "Aapki haan ke baad hi bill katta hai. Button do baar dab jaaye, tab bhi bill ek hi banega." },
+  { title: "Speak", text: "Hold the mic and say the customer's name, how many pieces, which grade, and how much came in cash or UPI." },
+  { title: "Bolo reads it back", text: "It reads out the total, cash, UPI, credit and the new balance in Hindi, while the bill builds on screen." },
+  { title: "Say yes to save", text: "The bill is saved only after you say yes. Even a double tap makes just one bill." },
 ];
 
 // Commands the voice parser handles today (from the README).
 const EXAMPLES = [
-  { say: "Manat ko 10 piece grade 1 aur 5 grade 2, 4 hazaar cash.", note: "Poora bill ek baar mein." },
-  { say: "Vikas ko das piece.", note: "Grade nahi bola? Bolo poochhega: kaunsa grade?" },
-  { say: "Grade 2 nahi, grade 1 kar.", note: "Galti bolke hi sudhaar lijiye." },
-  { say: "Haan, kaat do.", note: "Read-back sunne ke baad bill kaatiye." },
-  { say: "Vikas ka hisaab batao.", note: "Udhaar aur limit, bill chhode bina." },
-  { say: "Aaj kitni sale hui?", note: "Aaj ke bills ka total, India ke time se." },
+  { say: "Manat ko 10 piece grade 1 aur 5 grade 2, 4 hazaar cash.", note: "The whole bill at once." },
+  { say: "Vikas ko das piece.", note: "Forgot the grade? Bolo asks which one." },
+  { say: "Grade 2 nahi, grade 1 kar.", note: "Fix a mistake just by saying it." },
+  { say: "Haan, kaat do.", note: "Save after hearing the read-back." },
+  { say: "Vikas ka hisaab batao.", note: "Credit and limit, without leaving the bill." },
+  { say: "Aaj kitni sale hui?", note: "Today's bill total, in India time." },
 ];
 
 const GROUPS: { label: string; items: { icon: SiteIconName; title: string; text: string }[] }[] = [
   {
-    label: "Bolna",
+    label: "Speaking",
     items: [
-      { icon: "chat", title: "Hindi aur Hinglish", text: "Jaise counter par bolte hain, waise hi. Grade ke liye 'do number' bhi chalega." },
-      { icon: "undo", title: "Bolke sudhaaro", text: "Grade, piece ya payment galat ho gaya? Bas bol dijiye kya badalna hai." },
-      { icon: "chart", title: "Hisaab poochho", text: "Kisi ka udhaar, aaj ki sale, ya sabse zyada udhaar kiska hai." },
+      { icon: "chat", title: "Hindi and Hinglish", text: "Just as you talk at the counter. 'Do number' works for grade 2 too." },
+      { icon: "undo", title: "Fix it by voice", text: "Wrong grade, pieces or payment? Just say what to change." },
+      { icon: "chart", title: "Ask about accounts", text: "Anyone's credit, today's sales, or who owes the most." },
     ],
   },
   {
-    label: "Hisaab",
+    label: "Accounts",
     items: [
-      { icon: "rupee", title: "Udhaar aur limit", text: "Cash aur UPI ke baad bacha paisa udhaar. Limit ke paas ya bahar ho to Bolo pehle batata hai." },
-      { icon: "check", title: "Ek bill, ek baar", text: "Har bill ki apni pehchaan hai, isliye galti se do bill nahi katte." },
-      { icon: "speaker", title: "Hindi mein read-back", text: "Bill katne se pehle poora hisaab sunaata hai, 'Phir suno' se dobara bhi." },
+      { icon: "rupee", title: "Credit and limits", text: "Whatever isn't paid in cash or UPI goes on credit. Bolo warns you when a customer is near or over the limit." },
+      { icon: "check", title: "One bill, once", text: "Every bill has its own ID, so a mistake can never make two bills." },
+      { icon: "speaker", title: "Read-back in Hindi", text: "Before saving, Bolo reads out the whole bill, and 'Play again' repeats it." },
     ],
   },
   {
-    label: "Bharosa",
+    label: "Trust",
     items: [
-      { icon: "shield", title: "Haan ke bina kuch nahi", text: "Bina aapki haan ke na bill katta hai, na khata badalta hai." },
-      { icon: "users", title: "Naam pe shak, toh sawaal", text: "Teen Afzal hain? Bolo poochhega kaunsa, andaaze se nahi chunega." },
-      { icon: "pen", title: "Likho bhi sakte hain", text: "Shor zyada ho to Likho se haath se bill banaiye. Dono ek hi bill par kaam karte hain." },
+      { icon: "shield", title: "Nothing without your yes", text: "No bill is saved and no ledger changes without your yes." },
+      { icon: "users", title: "Unsure of a name? It asks", text: "Three Afzals? Bolo asks which one instead of guessing." },
+      { icon: "pen", title: "Type when it's noisy", text: "When it's loud, add items by hand. Voice and touch work on the same bill." },
     ],
   },
 ];
@@ -56,17 +56,17 @@ export default function BoloHome() {
           <div>
             <p className="eyebrow">MandiPlus Bolo</p>
             <h1 className="display display-xl mt-5">
-              Bolo karo.
-              <span className="hindi-line block" lang="hi">बिल बन जाएगा।</span>
+              Just speak.
+              <span className="hindi-line block">Your bill is ready.</span>
             </h1>
             <p className="lead mt-6">
-              Counter par boliye. Bolo bill banata hai, cash aur UPI alag karta hai, aur baaki udhaar khate mein
-              likhta hai. Aapki haan ke baad hi bill katta hai.
+              Speak at the counter. Bolo makes the bill, splits cash and UPI, and puts the rest on the
+              customer&apos;s credit. Nothing is saved until you say yes.
             </p>
             <div className="mt-8 grid max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
-              <Link href="/app" className="btn btn-primary"><SiteIcon name="mic" />Bolo kholo</Link>
-              <Link href="/help" className="btn btn-outline">Kaise chalta hai</Link>
-              <a href="#examples" className="btn btn-soft sm:col-span-2">Bolke dekhiye</a>
+              <Link href="/app" className="btn btn-primary"><SiteIcon name="mic" />Open Bolo</Link>
+              <Link href="/help" className="btn btn-outline">How it works</Link>
+              <a href="#examples" className="btn btn-soft sm:col-span-2">Try saying it</a>
             </div>
           </div>
           <div className="flex justify-center md:justify-end"><PhoneMockup /></div>
@@ -74,8 +74,8 @@ export default function BoloHome() {
 
         <section className="site-section on-paper" aria-labelledby="steps-title">
           <div className="site-inner">
-            <p className="eyebrow">Kaise chalta hai</p>
-            <h2 id="steps-title" className="display display-lg mt-4">Teen kadam. Ek bill.</h2>
+            <p className="eyebrow">How it works</p>
+            <h2 id="steps-title" className="display display-lg mt-4">Three steps. One bill.</h2>
             <ol className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-3">
               {STEPS.map((step, i) => (
                 <li key={step.title}>
@@ -90,8 +90,8 @@ export default function BoloHome() {
 
         <section id="examples" className="site-section" aria-labelledby="examples-title">
           <div className="site-inner">
-            <p className="eyebrow">Bolke dekhiye</p>
-            <h2 id="examples-title" className="display display-lg mt-4">Aise boliye.</h2>
+            <p className="eyebrow">Try saying</p>
+            <h2 id="examples-title" className="display display-lg mt-4">Say it like this.</h2>
             <ul className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {EXAMPLES.map((example) => (
                 <li key={example.say} className="say-card">
@@ -105,8 +105,8 @@ export default function BoloHome() {
 
         <section className="site-section on-paper" aria-labelledby="built-title">
           <div className="site-inner">
-            <p className="eyebrow">Mandi ke liye bana</p>
-            <h2 id="built-title" className="display display-lg mt-4">Counter ki bhaag-daud ke liye.</h2>
+            <p className="eyebrow">Made for the mandi</p>
+            <h2 id="built-title" className="display display-lg mt-4">Built for the rush at the counter.</h2>
             <div className="columns mt-10">
               {GROUPS.map((group) => (
                 <div key={group.label}>
@@ -126,8 +126,8 @@ export default function BoloHome() {
 
         <section className="site-section" aria-labelledby="start-title">
           <div className="site-inner flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
-            <h2 id="start-title" className="display display-lg">Agla bill, bolke banaiye.</h2>
-            <Link href="/app" className="btn btn-primary"><SiteIcon name="mic" />Bolo kholo</Link>
+            <h2 id="start-title" className="display display-lg">Speak your next bill.</h2>
+            <Link href="/app" className="btn btn-primary"><SiteIcon name="mic" />Open Bolo</Link>
           </div>
         </section>
       </main>

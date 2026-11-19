@@ -9,7 +9,7 @@ export function SiteFooter() {
         <div className="footer-top">
           <div>
             <Wordmark onDark />
-            <p>Bolo: mandi ka bill, bolke.</p>
+            <p>Bolo: mandi bills, by voice.</p>
           </div>
           <nav className="footer-links" aria-label="MandiPlus">
             {FOOTER_LINKS.map((link) => (
@@ -17,7 +17,7 @@ export function SiteFooter() {
             ))}
           </nav>
         </div>
-        <p className="footer-note">Bolo Hindi aur Hinglish samajhta hai. Chrome mein sabse achha chalta hai.</p>
+        <p className="footer-note">Bolo understands Hindi and Hinglish. It works best in Chrome.</p>
       </div>
     </footer>
   );

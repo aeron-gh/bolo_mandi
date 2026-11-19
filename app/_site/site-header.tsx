@@ -12,7 +12,7 @@ export function SiteHeader({ current }: { current: Page }) {
       <Link href="/" aria-current={current === "bolo" ? "page" : undefined}>Bolo</Link>
       <Link href="/help" aria-current={current === "help" ? "page" : undefined}>Help</Link>
       <a href={MANDIPLUS_PRODUCTS} target="_blank" rel="noopener noreferrer">Products</a>
-      <Link href="/app" className="btn btn-primary btn-sm">Bolo kholo</Link>
+      <Link href="/app" className="btn btn-primary btn-sm">Open Bolo</Link>
     </>
   );
   return (
