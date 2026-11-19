@@ -14,8 +14,10 @@ import { confirmBill, fetchPreview, friendlyError, interpretBill, type BillBody 
 import { Conversation, type Message } from "./conversation.tsx";
 import { CustomerHeader } from "./customer-header.tsx";
 import { CustomerSheet } from "./customer-sheet.tsx";
-import { Dock, type MainAction } from "./dock.tsx";
+import { Dock } from "./dock.tsx";
 import { EntryPanel } from "./entry-panel.tsx";
+import { Icon } from "./icons.tsx";
+import { MicButton } from "./mic-button.tsx";
 import { Receipt } from "./receipt.tsx";
 import { speakHindi, stopSpeaking } from "./speech.ts";
 
@@ -30,6 +32,7 @@ export function BillScreen({ rates }: { rates: RateCard }) {
   );
 }
 
+type MainAction = { label: string; tone: "go" | "danger"; disabled: boolean };
 type Fresh = { preview: BillPreview | null; fresh: boolean };
 type CustomerSuggestion = { name: string; match: CustomerMatch };
 
@@ -53,7 +56,7 @@ function nextVoiceQuestion(followUp: FollowUp | null, missing: ReturnType<typeof
 }
 
 // The one big button changes with the bill's state. Nothing saves without "haan".
-function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean): { action: Omit<MainAction, "run">; hint: string | null } {
+function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean): { action: MainAction; hint: string | null } {
   if (draft.state === "SAVED" || draft.state === "CANCELLED") {
     return { action: { label: "Naya bill", tone: "go", disabled: false }, hint: null };
   }
@@ -65,7 +68,7 @@ function mainAction(draft: BillDraft, { preview, fresh }: Fresh, saving: boolean
   const missing = whatIsMissing(draft);
   const hint =
     missing === "customer" ? "Pehle customer chuno." :
-    missing === "items" ? "Ab maal jodo: mic dabao ya Likho kholo." :
+    missing === "items" ? "Grade aur quantity bolo ya Likho mein jodo." :
     (preview?.overpaidBy ?? 0) > 0 ? "Cash ya UPI theek karo." :
     !fresh ? "Hisaab ho raha hai" : null;
   return { action: { label: "Bill banao", tone: "go", disabled: Boolean(hint) }, hint };
@@ -79,6 +82,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const [previewVersion, setPreviewVersion] = useState(0);
   const [saving, setSaving] = useState(false);
   const saveInFlight = useRef(false);
+  const [mobileView, setMobileView] = useState<"chat" | "bill">("chat");
   const [words, setWords] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [voice, setVoice] = useState<"idle" | "recording" | "interpreting">("idle");
@@ -202,7 +206,6 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
     setVoice("recording");
     setWords("");
     setError(null);
-    setAnswer(null);
   }
 
   function askNext(missing: ReturnType<typeof whatIsMissing>, pending: FollowUp | null) {
@@ -226,6 +229,7 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
       ...(history.length && reply ? [{ author: "bolo", text: reply } as const] : []),
       { author: "owner", text },
     ]);
+    setAnswer(null);
     setVoice("interpreting");
     const controller = new AbortController();
     voiceRequest.current = controller;
@@ -309,39 +313,55 @@ function Workspace({ rates, onNewBill }: { rates: RateCard; onNewBill: () => voi
   const panel = <EntryPanel items={draft.items} cash={draft.cash} upi={draft.upi} rates={rates} locked={locked || busy} dispatch={edit} />;
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl flex-1 gap-4 p-3 sm:p-5 lg:min-h-[calc(100dvh-4.5rem)] lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <section aria-labelledby="conversation-heading" className="flex min-h-[70dvh] min-w-0 flex-col rounded-3xl border border-white/90 bg-[radial-gradient(ellipse_at_85%_0%,#f0eadf_0%,transparent_45%),linear-gradient(145deg,#ecf5f9,#eff0f8_75%,#f8fafc)] p-3 shadow-[0_12px_44px_#25395310] sm:p-5 lg:sticky lg:top-4 lg:h-[calc(100dvh-6.5rem)]">
-        <div className="flex items-center justify-between border-b border-[#cbd8e5]/70 pb-3">
-          <h1 id="conversation-heading" className="px-1 text-lg font-semibold tracking-tight text-[#253953]">Bolo conversation</h1>
-          <a href="#bill-workspace" className="rounded-lg px-2 py-1 text-sm font-semibold text-[#365b84] lg:hidden">Bill dekho</a>
-        </div>
+    <main className="workspace" data-mobile-view={mobileView}>
+      <nav aria-label="Workspace view" className="view-switch">
+        <button aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")}><Icon name="chat" />Bolo assistant</button>
+        <button aria-pressed={mobileView === "bill"} onClick={() => setMobileView("bill")}><Icon name="receipt" />Current bill
+          {draft.items.length > 0 && <span className="item-count">{draft.items.length}</span>}
+        </button>
+      </nav>
+      <section aria-labelledby="conversation-heading" className="conversation-panel">
+        <header className="panel-heading">
+          <span className="panel-icon"><Icon name="sound" /></span>
+          <h1 id="conversation-heading">Bolo assistant</h1>
+          <span className="language-label"><span aria-hidden>अ</span> Hindi + English</span>
+        </header>
         <Conversation messages={messages} words={voice === "recording" ? words : ""}
           reply={voice === "idle" ? reply : null}
-          onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? review : null}
-          onExample={submitText} disabled={busy || micDisabled} />
-        <Dock action={{ ...action, disabled: action.disabled || Boolean(followUp), run }}
-          hint={reply ? null : hint} busy={busy} micDisabled={micDisabled}
-          onStart={startVoice} onWords={setWords}
-          onFinish={(text, problem) => void finishVoice(text, problem)} onType={submitText}
-          onLikho={() => setLikhoOpen(true)} />
+          onReplay={!pendingProblem && answer ? () => speakHindi(answer.speech) : !pendingProblem && question ? () => { if (fresh && preview) speakPreview(preview.data); } : null}
+          onExample={submitText} disabled={busy || micDisabled}>
+          <MicButton disabled={micDisabled} onStart={startVoice} onWords={setWords}
+            onFinish={(text, problem) => void finishVoice(text, problem)} />
+        </Conversation>
+        {draft.state === "AWAITING_CONFIRM" && <button className="mobile-review" onClick={() => setMobileView("bill")}>Bill dekho <Icon name="chevron" /></button>}
+        {locked && <button className="mobile-review" onClick={onNewBill}>Naya bill <Icon name="chevron" /></button>}
+        <Dock busy={busy} micDisabled={micDisabled} onType={submitText} onLikho={() => setLikhoOpen(true)} />
       </section>
 
-      <aside id="bill-workspace" aria-label="Bill workspace" className="min-w-0 space-y-3 rounded-3xl border border-white/90 bg-white/65 p-3 shadow-[0_12px_44px_#25395310] sm:p-4">
-        <div className="hidden items-center gap-3 rounded-2xl border border-[#dfe5ef] bg-[#eef1f8] p-3 lg:flex">
-          <span aria-hidden className="grid size-10 place-items-center rounded-xl bg-[#253953] text-sm font-semibold text-white">AM</span>
-          <div>
-            <p className="font-semibold text-[#253953]">Aarav Mehta</p>
-            <p className="text-xs text-[#52627b]">Demo owner</p>
+      <aside id="bill-workspace" aria-label="Bill workspace" className="bill-pane">
+        <section className="bill-paper">
+          <header className="panel-heading">
+            <span className="panel-icon"><Icon name="receipt" /></span>
+            <h2>Current bill</h2>
+            <span className="bill-status">{{ DRAFT: "Draft", AWAITING_CONFIRM: "Review", SAVED: "Saved", CANCELLED: "Cancelled" }[draft.state]}</span>
+          </header>
+          <div className="bill-content">
+            <CustomerHeader customer={draft.customer}
+              account={preview?.data.customer.id === draft.customer?.id ? preview?.data.customer ?? null : null}
+              note={pickNote} locked={locked || busy} onChange={() => setCustomerOpen(true)} />
+            <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
+              onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
+            <button type="button" className={`bill-action ${action.tone === "danger" ? "danger" : ""}`}
+              onClick={run} disabled={action.disabled || busy || Boolean(followUp)}>{action.label}<Icon name="chevron" /></button>
+            {!locked && (nextQuestion || hint) && <p className="bill-hint">{nextQuestion || hint}</p>}
           </div>
-        </div>
-        <h2 className="px-1 pt-2 font-semibold text-[#253953]">Current bill</h2>
-        <div className="rounded-2xl border border-line bg-paper p-3 shadow-sm">
-          <CustomerHeader customer={draft.customer}
-            account={preview?.data.customer.id === draft.customer?.id ? preview?.data.customer ?? null : null}
-            note={pickNote} locked={locked || busy} onChange={() => setCustomerOpen(true)} />
-        </div>
-        <Receipt draft={draft} preview={preview?.data ?? null} fresh={fresh} rates={rates} blocked={busy}
-          onCancel={() => { setSuggestion(null); edit({ type: "cancel" }); }} />
+        </section>
+        <section className="rate-card" aria-labelledby="rates-title">
+          <h2 id="rates-title"><Icon name="book" />Rate card</h2>
+          <dl>{([1, 2, 3] as const).map(grade =>
+            <div key={grade}><dt>Grade {grade}</dt><dd>{formatRupees(rates[grade])}</dd></div>
+          )}</dl>
+        </section>
       </aside>
 
       <CustomerSheet key={suggestion ? `voice:${suggestion.name}` : "manual"} open={customerOpen} suggestion={suggestion} onOpenChange={setCustomerOpen} onPick={pick} />

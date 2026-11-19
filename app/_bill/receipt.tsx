@@ -6,6 +6,8 @@ import type { RateCard } from "@/lib/billing.ts";
 import type { BillDraft } from "@/lib/draft.ts";
 import { formatRupees as r } from "@/lib/money.ts";
 
+import { Icon } from "./icons.tsx";
+
 type Props = { draft: BillDraft; preview: BillPreview | null; fresh: boolean; rates: RateCard; blocked: boolean; onCancel: () => void };
 
 function Row({ label, value, strong }: { label: ReactNode; value: string; strong?: boolean }) {
@@ -29,19 +31,24 @@ export function Receipt({ draft, preview, fresh, rates, blocked, onCancel }: Pro
   const p = fresh ? preview : null;
   const open = draft.state === "DRAFT" || draft.state === "AWAITING_CONFIRM";
   if (draft.items.length === 0 && open) {
-    return <p className="rounded-2xl border border-dashed border-line bg-paper px-4 py-9 text-center text-muted">Abhi koi maal nahi. Mic dabao ya Likho kholo.</p>;
+    return <div className="receipt-empty">
+      <div className="empty-lines"><span className="receipt-glyph"><Icon name="receipt" /></span>
+        <h3>Abhi koi maal nahi</h3><p>Grade aur quantity bolo ya Likho mein jodo.</p>
+      </div>
+      <div className="empty-total"><span>Total</span><strong>{r(0)}</strong></div>
+    </div>;
   }
   return (
     <section aria-label="Bill" className="relative">
-      <div className={`rounded-2xl border border-line bg-paper px-4 py-4 shadow-sm sm:px-5 ${draft.state === "CANCELLED" ? "opacity-50" : ""}`}>
-        <div className="mb-1 grid grid-cols-[1fr_auto_6rem] gap-3 border-b border-line pb-2 text-sm font-semibold text-muted">
+      <div className={`pt-4 ${draft.state === "CANCELLED" ? "opacity-50" : ""}`}>
+        <div className="mb-1 grid grid-cols-[1fr_auto_minmax(3rem,auto)] gap-3 border-b border-line pb-2 text-sm font-semibold text-muted">
           <span>Maal</span><span>Qty × Rate</span><span className="text-right">Rakam</span>
         </div>
         <ul className="divide-y divide-line">
           {draft.items.map((item, i) => {
             const rate = item.rate ?? rates[item.grade];
             return (
-              <li key={i} className="row-in grid grid-cols-[1fr_auto_6rem] items-baseline gap-3 py-2">
+              <li key={i} className="row-in grid grid-cols-[1fr_auto_minmax(3rem,auto)] items-baseline gap-3 py-2">
                 <span className="font-semibold">Grade {item.grade}</span>
                 <span className="text-muted">
                   {item.qty || "?"}{item.unit === "crate" ? " crate" : ""} × <span className={item.rate !== undefined ? "font-semibold text-ink" : ""}>{r(rate)}</span>

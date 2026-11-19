@@ -41,7 +41,7 @@ The browser recognition path can show text while the trader speaks. The local Wh
 
 ## Verification at handoff
 
-Bolo now answers account, today's sales, and highest outstanding balance questions while preserving the draft. The workspace pairs a conversation log and typed composer with the bill panel. Aarav Mehta is a display-only demo owner. The voice control uses the supplied silent orb video and pauses when idle or when reduced motion is requested.
+Bolo now answers account, today's sales, and highest outstanding balance questions while preserving the draft. The workspace pairs a conversation log and typed composer with the bill panel. Aarav Mehta is a display-only demo owner. The desktop pairs the assistant with a live receipt and grade rate card. On phones, the assistant and current bill are two views of the same mounted draft. Bill review, confirmation, and new-bill actions live with the receipt. The voice control is a CSS waveform button with a halo driven by microphone volume. It respects reduced motion and supports holding the pointer, Space, or Enter. The welcome screen uses the larger control and the active conversation uses a compact version of that same button. Workspace styling is in `app/globals.css`.
 
 - `npm test` passed all 128 tests. `npm run lint`, `npm run typecheck`, `git diff --check`, and the default Turbopack production build passed.
 - A live Sarvam Chrome test used three synthesized Hindi clips. Bolo drafted an order, answered a spoken account question while the grade was pending, then applied the spoken grade to the same draft. The test issued no save request.

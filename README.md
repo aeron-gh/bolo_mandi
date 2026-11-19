@@ -43,7 +43,7 @@ when Bolo asks for the grade. If it asks how much cash arrived, say the amount.
 You can ask “Vikas ka hisaab batao,” “Aaj kitni sale hui?” or “Sabse zyada
 udhaar kiska hai?” Bolo reads the answer aloud and keeps the current bill.
 The conversation pane also accepts typed commands. Aarav Mehta is a demo
-owner label for the workspace.
+owner label for the workspace. On a phone, tap **Current bill** to review the receipt and confirm, or **Bolo assistant** to return to the same conversation.
 
 Bolo reads back the total, payment split, new udhaar and any credit warning in
 Hindi using the browser's speech voice. Check the receipt, then say “haan, kaat

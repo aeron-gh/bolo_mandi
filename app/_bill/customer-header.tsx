@@ -3,6 +3,8 @@
 import type { Account, Customer } from "@/lib/customers.ts";
 import { formatRupees as r } from "@/lib/money.ts";
 
+import { Icon } from "./icons.tsx";
+
 type Props = {
   customer: Customer | null;
   account: Account | null;
@@ -26,16 +28,17 @@ export function CustomerHeader({ customer, account, note, locked, onChange }: Pr
       <button
         onClick={onChange}
         disabled={locked}
-        className="flex h-20 w-full items-center rounded-xl border-2 border-dashed border-line px-4 text-left text-2xl font-semibold outline-coconut focus-visible:outline-3 disabled:opacity-40"
+        className="customer-picker"
       >
-        Customer chuno
+        <span className="customer-icon"><Icon name="person" /></span>
+        Customer chuno <Icon name="chevron" className="ml-auto size-4" />
       </button>
     );
   }
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="min-w-0 text-4xl font-semibold leading-tight">{customer.name}</h1>
+        <h3 className="min-w-0 wrap-anywhere text-2xl font-semibold leading-tight">{customer.name}</h3>
         {!locked && (
           <button onClick={onChange} className="h-11 shrink-0 rounded-lg px-3 font-medium text-coconut outline-coconut hover:bg-paper focus-visible:outline-2">
             Badlo

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: "Voice billing for the mandi counter",
 };
 
-export const viewport: Viewport = { themeColor: "#f7f8f6" };
+export const viewport: Viewport = { themeColor: "#f5f5fa" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
