@@ -10,7 +10,7 @@ import type { Shop } from "@/lib/shop.ts";
 import { forgetDraft } from "@/app/_bill/draft-store.ts";
 import { Icon } from "@/app/_bill/icons.tsx";
 import { StatusLine, useSubmit, type Status } from "./form-bits.tsx";
-import { messageOf, ownerFetch, useOwnerCall } from "./owner-call.tsx";
+import { messageOf, ownerFetch, PinNeeded, useOwnerCall } from "./owner-call.tsx";
 
 type Run = <T>(task: () => Promise<T>) => Promise<T>;
 type Props = { shop: Shop; rates: RateCard; demo: boolean; user: User | null; draftKey: string };
@@ -42,6 +42,7 @@ export function ProfileForms({ shop, rates, demo, user, draftKey }: Props) {
         <ShopPanel shop={shop} run={owner.run} />
         <RatesPanel rates={rates} run={owner.run} />
         <PinPanel demo={demo} hasPin={shop.hasPin} run={owner.run} />
+        {!demo && <BackupPanel run={owner.run} />}
         <AccountPanel demo={demo} user={user} draftKey={draftKey} />
       </div>
       {owner.prompt}
@@ -192,6 +193,45 @@ function PinPanel({ demo, hasPin, run }: { demo: boolean; hasPin: boolean; run: 
         }}><Icon name="lock" /> Abhi lock karo</button>
       )}
       <StatusLine value={lockNote} />
+    </SettingRow>
+  );
+}
+
+// Download a copy of the whole shop. Owner only once a PIN is set, so it goes through the PIN check.
+function BackupPanel({ run }: { run: Run }) {
+  const [status, setStatus] = useState<Status>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function download() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const file = await run(async () => {
+        const res = await fetch("/api/backup");
+        if (res.ok) return res.blob();
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        if (res.status === 401 && data.error === "pin_required") throw new PinNeeded();
+        throw new Error(data.error ?? "Backup nahi bana. Dobara try karein.");
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(file);
+      link.download = `bolo-backup-${new Date().toISOString().slice(0, 10)}.db`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      setStatus({ ok: true, text: "Backup download ho gaya. Ise pen drive ya Google Drive mein rakh lijiye." });
+    } catch (error) {
+      setStatus({ ok: false, text: messageOf(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SettingRow title="Backup" note="Har din ek backup apne aap banta hai, aakhri 14 din ke rakhe jaate hain. Kabhi bhi poori dukaan ki copy le sakte hain.">
+      <button type="button" className="btn btn-outline justify-self-start" onClick={() => void download()} disabled={busy}>
+        {busy ? "Ruko…" : "Backup download karo"}
+      </button>
+      <StatusLine value={status} />
     </SettingRow>
   );
 }

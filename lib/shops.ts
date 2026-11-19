@@ -35,3 +35,9 @@ export function crossSite(headers: Headers, appOrigin?: string): boolean {
     return true;
   }
 }
+
+// Daily backups of one account's shop, kept next to the data.
+export function backupDir(userId: number): string {
+  shopFile(userId); // same id check
+  return path.join(DATA_DIR, "backups", String(userId));
+}

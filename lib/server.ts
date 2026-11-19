@@ -8,9 +8,11 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
 import { openAccounts, userForSession, type User } from "./accounts.ts";
+import { dailyBackup } from "./backup.ts";
 import { loadSeed, openDb, readSeed } from "./db.ts";
+import { indiaDay } from "./history.ts";
 import { PinRequired, tokenFromCookie } from "./shop-api.ts";
-import { ACCOUNTS_FILE, cookieValue, crossSite, DEMO_FILE, shopFile } from "./shops.ts";
+import { ACCOUNTS_FILE, backupDir, cookieValue, crossSite, DEMO_FILE, shopFile } from "./shops.ts";
 
 export const USER_COOKIE = "bolo_user";
 export const DEMO_COOKIE = "bolo_demo";
@@ -26,7 +28,9 @@ export class LoginRequired extends Error {
 }
 
 // Open handles survive hot reload in dev, so each file is opened once.
-const handles = globalThis as typeof globalThis & { boloShops?: Map<string, DatabaseSync>; boloAccounts?: DatabaseSync };
+const handles = globalThis as typeof globalThis & {
+  boloShops?: Map<string, DatabaseSync>; boloAccounts?: DatabaseSync; boloBackups?: Map<number, string>;
+};
 
 function openFile(file: string): DatabaseSync {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -66,10 +70,26 @@ export function resetDemo(): void {
   shopDb(DEMO_FILE, true);
 }
 
+// First use of a real shop each India day starts that day's backup in the background.
+function backupToday(userId: number, db: DatabaseSync): void {
+  const day = indiaDay(new Date());
+  handles.boloBackups ??= new Map();
+  if (handles.boloBackups.get(userId) === day) return;
+  handles.boloBackups.set(userId, day);
+  dailyBackup(db, backupDir(userId), new Date()).catch((error) => {
+    handles.boloBackups?.delete(userId);
+    console.error(`Backup failed for shop ${userId}:`, error);
+  });
+}
+
 function contextFrom(read: (name: string) => string | null): ShopContext | null {
   const token = read(USER_COOKIE);
   const user = token && /^[0-9a-f]{64}$/.test(token) ? userForSession(accountsDb(), token, new Date()) : null;
-  if (user) return { db: userShopDb(user.id), mode: "user", user, key: `u${user.id}` };
+  if (user) {
+    const db = userShopDb(user.id);
+    backupToday(user.id, db);
+    return { db, mode: "user", user, key: `u${user.id}` };
+  }
   if (read(DEMO_COOKIE) === "1") return { db: shopDb(DEMO_FILE, true), mode: "demo", user: null, key: "demo" };
   return null;
 }
@@ -107,15 +127,20 @@ export function cookieOptions(req: Request, maxAgeSeconds: number) {
   return { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: maxAgeSeconds, secure: new URL(req.url).protocol === "https:" };
 }
 
-// Run the work; missing login or PIN become 401, any other error a 400 with a short message.
+// Missing login or PIN become 401, any other error a 400 with a short message.
+export function errorResponse(error: unknown): Response {
+  if (error instanceof LoginRequired) return Response.json({ error: "login_required" }, { status: 401 });
+  if (error instanceof PinRequired) return Response.json({ error: "pin_required" }, { status: 401 });
+  const message = error instanceof Error ? error.message : "something went wrong";
+  return Response.json({ error: message }, { status: 400 });
+}
+
+// Run the work and send its result as JSON, or the error.
 export async function reply(work: () => unknown): Promise<Response> {
   try {
     return Response.json(await work());
   } catch (error) {
-    if (error instanceof LoginRequired) return Response.json({ error: "login_required" }, { status: 401 });
-    if (error instanceof PinRequired) return Response.json({ error: "pin_required" }, { status: 401 });
-    const message = error instanceof Error ? error.message : "something went wrong";
-    return Response.json({ error: message }, { status: 400 });
+    return errorResponse(error);
   }
 }
 
